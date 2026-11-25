@@ -16,6 +16,7 @@ from app.models.exam import (
     Rubric,
     RubricCriterion,
 )
+from app.models.submission import Submission, SubmissionFile, SubmissionStatus
 from app.models.user import RefreshToken, User, UserRole
 
 __all__ = [
@@ -36,6 +37,9 @@ __all__ = [
     "CourseSection",
     "RefreshToken",
     "SectionEnrollment",
+    "Submission",
+    "SubmissionFile",
+    "SubmissionStatus",
     "User",
     "UserRole",
 ]
