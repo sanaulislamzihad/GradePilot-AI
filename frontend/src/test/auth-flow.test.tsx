@@ -30,11 +30,20 @@ const teacherDashboard = {
   exam_count: 0,
   published_exam_count: 0,
   draft_exam_count: 0,
+  submission_count: 0,
   courses: [],
   recent_exams: [],
   recent_activity: [],
 }
-const studentDashboard = { enrollment_count: 0, course_count: 0, enrollments: [], recent_activity: [] }
+const studentDashboard = {
+  enrollment_count: 0,
+  course_count: 0,
+  available_exam_count: 0,
+  submitted_exam_count: 0,
+  upcoming_exams: [],
+  enrollments: [],
+  recent_activity: [],
+}
 
 function renderApp(path: string, session: TokenResponse | null) {
   vi.mocked(refreshSession).mockImplementation(() =>
@@ -80,7 +89,7 @@ describe('teacher dashboard', () => {
 
     const nav = screen.getAllByRole('navigation', { name: 'Main' })[0]!
     const links = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)
-    expect(links).toEqual(['Dashboard', 'My Exams', 'Create Exam', 'Courses', 'Profile'])
+    expect(links).toEqual(['Dashboard', 'My Exams', 'Create Exam', 'Submissions', 'Courses', 'Profile'])
   })
 })
 

@@ -52,6 +52,7 @@ function exam(overrides: Partial<ExamDetail> = {}): ExamDetail {
     exam_date: null,
     submission_deadline: '2030-01-01T10:00:00Z',
     question_count: questions.length,
+    submission_count: 0,
     created_at: '2026-11-25T10:00:00Z',
     updated_at: '2026-11-25T10:00:00Z',
     published_at: null,
