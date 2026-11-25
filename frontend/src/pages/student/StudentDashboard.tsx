@@ -1,4 +1,4 @@
-import { BookOpen, GraduationCap, Layers } from 'lucide-react'
+import { BookOpen, ClipboardList, GraduationCap, Inbox } from 'lucide-react'
 import { Link } from 'react-router'
 import { ActivityList } from '@/components/ActivityList'
 import { buttonVariants } from '@/components/ui/Button'
@@ -9,6 +9,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/States'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
 import { dashboardApi } from '@/services/api'
+import { formatDateTime, formatRelative } from '@/utils/format'
 
 export default function StudentDashboard() {
   const { user } = useAuth()
@@ -24,8 +25,8 @@ export default function StudentDashboard() {
           </>
         }
         actions={
-          <Link to="/student/courses" className={buttonVariants({ variant: 'secondary' })}>
-            Join a course
+          <Link to="/student/exams" className={buttonVariants()}>
+            Available exams
           </Link>
         }
       />
@@ -36,10 +37,37 @@ export default function StudentDashboard() {
         <ErrorState message={error} onRetry={reload} />
       ) : data ? (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <StatCard label="Courses" value={data.course_count} icon={BookOpen} />
-            <StatCard label="Sections joined" value={data.enrollment_count} icon={Layers} />
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard label="Available exams" value={data.available_exam_count} icon={ClipboardList} />
+            <StatCard label="Submitted" value={data.submitted_exam_count} icon={Inbox} />
+            <StatCard label="Courses" value={data.course_count} icon={BookOpen} hint={`${data.enrollment_count} section${data.enrollment_count === 1 ? '' : 's'} joined`} />
           </div>
+
+          <Card>
+            <CardHeader title="Upcoming deadlines" description="Open exams you have not submitted yet." />
+            {data.upcoming_exams.length === 0 ? (
+              <p className="px-5 py-6 text-sm text-zinc-500">Nothing due. You are up to date.</p>
+            ) : (
+              <ul className="divide-y divide-zinc-100">
+                {data.upcoming_exams.map((exam) => (
+                  <li key={exam.id}>
+                    <Link to={`/student/exams/${exam.slug}`} className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-zinc-50">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-zinc-900">{exam.title}</p>
+                        <p className="text-xs text-zinc-500">
+                          {exam.course_code && <span className="font-mono">{exam.course_code} · </span>}
+                          Due {formatDateTime(exam.submission_deadline)}
+                        </p>
+                      </div>
+                      {exam.submission_deadline && (
+                        <span className="shrink-0 text-xs font-medium text-zinc-700">{formatRelative(exam.submission_deadline)}</span>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
 
           <div className="grid gap-6 lg:grid-cols-5">
             <Card className="lg:col-span-3">
