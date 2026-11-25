@@ -1,0 +1,32 @@
+@import '@fontsource-variable/inter';
+@import 'tailwindcss';
+
+/*
+ * Design system: a neutral, monochrome zinc palette with no gradients.
+ * Colour is used only to signal meaning (errors, status), never decoration.
+ */
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Code', Menlo, monospace;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-white text-zinc-900;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  ::selection {
+    @apply bg-zinc-900 text-white;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-zinc-900;
+  }
+}

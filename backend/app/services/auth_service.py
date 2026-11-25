@@ -17,6 +17,13 @@ from app.security.tokens import create_access_token, generate_refresh_token, has
 from app.services import audit
 
 
+REUSE_GRACE_PERIOD = timedelta(seconds=30)
+
+
+class StaleRefreshTokenError(AppError):
+    """A just-rotated token was replayed by a concurrent request from the same browser."""
+
+
 @dataclass
 class IssuedSession:
     access_token: str
@@ -100,8 +107,22 @@ def rotate_refresh_token(db: Session, raw_token: str, client: ClientInfo) -> Iss
         raise AppError(401, "Session expired. Please sign in again.")
 
     if stored.revoked_at is not None:
-        # A rotated token was presented again: it may have been stolen.
-        # Revoke every token in this login family.
+        family_alive = db.scalar(
+            select(RefreshToken.id).where(
+                RefreshToken.family_id == stored.family_id,
+                RefreshToken.revoked_at.is_(None),
+                RefreshToken.expires_at > utcnow(),
+            )
+        )
+        if not family_alive:
+            # Signed out, password changed or already revoked: nothing to protect.
+            raise AppError(401, "Session expired. Please sign in again.")
+        if utcnow() - as_utc(stored.revoked_at) < REUSE_GRACE_PERIOD:
+            # Two tabs refreshing at once share one cookie; the slower request
+            # arrives with the token the faster one just rotated. Not an attack.
+            raise StaleRefreshTokenError(409, "Session was refreshed in another tab. Retry.")
+        # A rotated token was presented again long after rotation while its
+        # successor is still live: it may have been stolen. Revoke the family.
         revoke_family(db, stored.family_id)
         audit.record(db, "auth.refresh_reuse", actor=stored.user, ip_address=client.ip_address)
         db.commit()

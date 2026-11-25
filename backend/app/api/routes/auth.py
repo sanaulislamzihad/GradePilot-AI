@@ -40,6 +40,9 @@ def refresh(
         raise AppError(401, "Not signed in")
     try:
         session = auth_service.rotate_refresh_token(db, refresh_token, client)
+    except auth_service.StaleRefreshTokenError:
+        # Keep the cookie: the browser already holds the newer token.
+        raise
     except AppError as exc:
         # Drop the dead cookie so the browser stops sending it.
         failure = Response(status_code=exc.status_code)

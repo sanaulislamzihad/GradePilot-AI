@@ -1,0 +1,65 @@
+import { lazy, Suspense } from 'react'
+import { Route, Routes } from 'react-router'
+import { LoadingState } from '@/components/ui/States'
+import { AppLayout } from '@/layouts/AppLayout'
+import { GuestOnly, RequireRole } from '@/layouts/RouteGuards'
+import LandingPage from '@/pages/LandingPage'
+import NotFoundPage from '@/pages/NotFoundPage'
+import LoginPage from '@/pages/auth/LoginPage'
+import RegisterPage from '@/pages/auth/RegisterPage'
+
+// Role areas are split into separate chunks; visitors only download what they use.
+const ProfilePage = lazy(() => import('@/pages/shared/ProfilePage'))
+const TeacherDashboard = lazy(() => import('@/pages/teacher/TeacherDashboard'))
+const CoursesPage = lazy(() => import('@/pages/teacher/CoursesPage'))
+const CourseDetailPage = lazy(() => import('@/pages/teacher/CourseDetailPage'))
+const StudentDashboard = lazy(() => import('@/pages/student/StudentDashboard'))
+const StudentCoursesPage = lazy(() => import('@/pages/student/StudentCoursesPage'))
+const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'))
+const UsersPage = lazy(() => import('@/pages/admin/UsersPage'))
+const AuditLogPage = lazy(() => import('@/pages/admin/AuditLogPage'))
+const SystemPage = lazy(() => import('@/pages/admin/SystemPage'))
+
+export default function App() {
+  return (
+    <Suspense fallback={<LoadingState className="min-h-screen" />}>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+
+        <Route element={<GuestOnly />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
+
+        <Route element={<RequireRole role="teacher" />}>
+          <Route path="/teacher" element={<AppLayout />}>
+            <Route index element={<TeacherDashboard />} />
+            <Route path="courses" element={<CoursesPage />} />
+            <Route path="courses/:courseId" element={<CourseDetailPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+          </Route>
+        </Route>
+
+        <Route element={<RequireRole role="student" />}>
+          <Route path="/student" element={<AppLayout />}>
+            <Route index element={<StudentDashboard />} />
+            <Route path="courses" element={<StudentCoursesPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+          </Route>
+        </Route>
+
+        <Route element={<RequireRole role="admin" />}>
+          <Route path="/admin" element={<AppLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="audit" element={<AuditLogPage />} />
+            <Route path="system" element={<SystemPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </Suspense>
+  )
+}

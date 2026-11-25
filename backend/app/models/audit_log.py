@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String
+from sqlalchemy import JSON, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database.base import Base, UUIDPrimaryKey, utcnow
+from app.database.base import Base, UTCDateTime, UUIDPrimaryKey, utcnow
 from app.models.user import User
 
 
@@ -24,6 +24,6 @@ class AuditLog(UUIDPrimaryKey, Base):
     entity_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
 
     actor: Mapped[User | None] = relationship()
