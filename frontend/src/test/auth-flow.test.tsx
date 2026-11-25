@@ -23,7 +23,17 @@ vi.mock('@/services/api', () => ({
   profileApi: {},
 }))
 
-const teacherDashboard = { course_count: 2, section_count: 3, student_count: 41, courses: [], recent_activity: [] }
+const teacherDashboard = {
+  course_count: 2,
+  section_count: 3,
+  student_count: 41,
+  exam_count: 0,
+  published_exam_count: 0,
+  draft_exam_count: 0,
+  courses: [],
+  recent_exams: [],
+  recent_activity: [],
+}
 const studentDashboard = { enrollment_count: 0, course_count: 0, enrollments: [], recent_activity: [] }
 
 function renderApp(path: string, session: TokenResponse | null) {
@@ -70,7 +80,7 @@ describe('teacher dashboard', () => {
 
     const nav = screen.getAllByRole('navigation', { name: 'Main' })[0]!
     const links = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)
-    expect(links).toEqual(['Dashboard', 'Courses', 'Profile'])
+    expect(links).toEqual(['Dashboard', 'My Exams', 'Create Exam', 'Courses', 'Profile'])
   })
 })
 
