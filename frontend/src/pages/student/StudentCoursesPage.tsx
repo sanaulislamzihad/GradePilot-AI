@@ -57,11 +57,11 @@ export default function StudentCoursesPage() {
                 <Input
                   value={code}
                   onChange={(event) => setCode(event.target.value.toUpperCase())}
-                  placeholder="e.g. K7PM2QXR"
+                  placeholder="Join code, e.g. K7PM2QXR"
                   aria-label="Join code"
                   maxLength={12}
                   autoComplete="off"
-                  className="font-mono tracking-widest uppercase"
+                  className="font-mono tracking-widest uppercase placeholder:font-sans placeholder:tracking-normal placeholder:normal-case"
                 />
                 <Button type="submit" loading={joining}>
                   Join
