@@ -18,7 +18,7 @@ vi.mock('@/services/api', () => ({
   authApi: { login: vi.fn(), register: vi.fn(), logout: vi.fn(), me: vi.fn() },
   dashboardApi: { teacher: vi.fn(), student: vi.fn() },
   courseApi: {},
-  studentApi: {},
+  studentApi: { enrollments: vi.fn().mockResolvedValue([]) },
   adminApi: {},
   profileApi: {},
 }))
@@ -161,5 +161,17 @@ describe('registration', () => {
     await user.type(screen.getByLabelText('Confirm password'), 'Different1')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
     expect(await screen.findByText('Passwords do not match')).toBeInTheDocument()
+  })
+})
+
+describe('return after sign-in', () => {
+  it('opens the page that required sign-in once the student signs in', async () => {
+    const user = userEvent.setup()
+    vi.mocked(authApi.login).mockResolvedValue(makeSession('student'))
+    renderApp('/student/courses', null)
+    await user.type(await screen.findByLabelText('Email'), 'student@example.edu')
+    await user.type(screen.getByLabelText('Password'), 'Passw0rd!')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByRole('heading', { name: 'My Courses' })).toBeInTheDocument()
   })
 })

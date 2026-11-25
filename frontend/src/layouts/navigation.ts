@@ -58,3 +58,9 @@ export const homePath: Record<UserRole, string> = {
   student: '/student',
   admin: '/admin',
 }
+
+/** Where to go after signing in: back to the page that asked for it, if it belongs to this role. */
+export function postLoginPath(role: UserRole, from: unknown): string {
+  const home = homePath[role]
+  return typeof from === 'string' && (from === home || from.startsWith(`${home}/`)) ? from : home
+}

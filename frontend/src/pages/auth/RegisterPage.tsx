@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { GraduationCap, Presentation } from 'lucide-react'
 import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { FormAlert } from '@/components/FormAlert'
@@ -11,7 +11,7 @@ import { FormField } from '@/components/ui/FormField'
 import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/hooks/useAuth'
 import { AuthLayout } from '@/layouts/AuthLayout'
-import { homePath } from '@/layouts/navigation'
+import { postLoginPath } from '@/layouts/navigation'
 import { errorMessage, fieldErrors } from '@/services/http'
 import { cn } from '@/utils/cn'
 import { emailField, optionalText, passwordField } from '@/utils/validation'
@@ -48,6 +48,7 @@ const roles = [
 export default function RegisterPage() {
   const { register: registerAccount } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [serverError, setServerError] = useState<string | null>(null)
   const {
     register,
@@ -69,7 +70,7 @@ export default function RegisterPage() {
         institution: values.institution || undefined,
       })
       toast.success('Account created. Welcome to GradePilot AI.')
-      navigate(homePath[user.role], { replace: true })
+      navigate(postLoginPath(user.role, (location.state as { from?: string } | null)?.from), { replace: true })
     } catch (error) {
       const fields = fieldErrors(error)
       for (const [field, message] of Object.entries(fields)) {
@@ -85,7 +86,7 @@ export default function RegisterPage() {
       subtitle={
         <>
           Already registered?{' '}
-          <Link to="/login" className="font-medium text-zinc-900 underline underline-offset-4">
+          <Link to="/login" state={location.state} className="font-medium text-zinc-900 underline underline-offset-4">
             Sign in
           </Link>
         </>

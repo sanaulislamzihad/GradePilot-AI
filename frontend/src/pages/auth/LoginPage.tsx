@@ -9,7 +9,7 @@ import { FormField } from '@/components/ui/FormField'
 import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/hooks/useAuth'
 import { AuthLayout } from '@/layouts/AuthLayout'
-import { homePath } from '@/layouts/navigation'
+import { postLoginPath } from '@/layouts/navigation'
 import { errorMessage } from '@/services/http'
 import { emailField } from '@/utils/validation'
 
@@ -35,8 +35,7 @@ export default function LoginPage() {
     try {
       const user = await login(values.email, values.password)
       // Return to the page that required sign-in, if it belongs to this role.
-      const from = (location.state as { from?: string } | null)?.from
-      navigate(from?.startsWith(homePath[user.role]) ? from : homePath[user.role], { replace: true })
+      navigate(postLoginPath(user.role, (location.state as { from?: string } | null)?.from), { replace: true })
     } catch (error) {
       setServerError(errorMessage(error))
     }
@@ -48,7 +47,7 @@ export default function LoginPage() {
       subtitle={
         <>
           New to GradePilot?{' '}
-          <Link to="/register" className="font-medium text-zinc-900 underline underline-offset-4">
+          <Link to="/register" state={location.state} className="font-medium text-zinc-900 underline underline-offset-4">
             Create an account
           </Link>
         </>
