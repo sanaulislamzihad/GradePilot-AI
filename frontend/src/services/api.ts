@@ -16,6 +16,11 @@ import type {
   Section,
   StudentDashboard,
   StudentEnrollment,
+  StudentExamDetail,
+  StudentExamItem,
+  SubmissionDetail,
+  SubmissionStatus,
+  SubmissionSummary,
   SystemStatus,
   TeacherDashboard,
   TokenResponse,
@@ -74,6 +79,19 @@ export const courseApi = {
 }
 
 export const studentApi = {
+  exams: () => data(http.get<StudentExamItem[]>('/student/exams')),
+  exam: (slug: string) => data(http.get<StudentExamDetail>(`/student/exams/${slug}`)),
+  submit: (examId: string, files: File[], idempotencyKey: string, onProgress?: (fraction: number) => void) => {
+    const form = new FormData()
+    files.forEach((file) => form.append('files', file))
+    return data(
+      http.post<SubmissionDetail>(`/exams/${examId}/submissions`, form, {
+        headers: { 'Idempotency-Key': idempotencyKey },
+        timeout: 300_000,
+        onUploadProgress: (event) => event.total && onProgress?.(event.loaded / event.total),
+      }),
+    )
+  },
   enrollments: () => data(http.get<StudentEnrollment[]>('/student/enrollments')),
   join: (join_code: string) => data(http.post<StudentEnrollment>('/student/enrollments', { join_code })),
   leave: (enrollmentId: string) => http.delete(`/student/enrollments/${enrollmentId}`),
@@ -181,4 +199,12 @@ export const examApi = {
 
 export const publicApi = {
   exam: (slug: string) => data(http.get<PublicExam>(`/public/exams/${slug}`)),
+}
+
+export const submissionApi = {
+  list: (params: { exam_id?: string; status?: SubmissionStatus; q?: string; latest_only?: boolean; page?: number; page_size?: number } = {}) =>
+    data(http.get<Page<SubmissionSummary>>('/submissions', { params })),
+  get: (id: string) => data(http.get<SubmissionDetail>(`/submissions/${id}`)),
+  downloadFile: (id: string, fileId: string) =>
+    http.get<Blob>(`/submissions/${id}/files/${fileId}`, { responseType: 'blob' }).then((r) => r.data),
 }
