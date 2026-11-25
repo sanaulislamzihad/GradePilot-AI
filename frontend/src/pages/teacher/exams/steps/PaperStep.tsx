@@ -8,7 +8,7 @@ import { CardBody } from '@/components/ui/Card'
 import { ConfirmDialog } from '@/components/ui/Dialog'
 import { examApi } from '@/services/api'
 import { errorMessage } from '@/services/http'
-import { useExamWorkspace } from '../workspace'
+import { leafQuestions, useExamWorkspace } from '../workspace'
 import { DocumentCard } from './DocumentCard'
 import { StepCard } from './StepCard'
 
@@ -41,7 +41,8 @@ export function PaperStep() {
     try {
       const result = await examApi.extractQuestions(exam.id, replace)
       setExam(result.exam)
-      toast.success(`Found ${result.created} question${result.created === 1 ? '' : 's'}. Review them before continuing.`)
+      const count = leafQuestions(result.exam).length
+      toast.success(`Found ${count} gradable question${count === 1 ? '' : 's'}. Review them before continuing.`)
       navigate(`/teacher/exams/${exam.id}/questions`)
     } finally {
       setExtracting(false)
