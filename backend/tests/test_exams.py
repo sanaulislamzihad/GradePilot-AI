@@ -71,8 +71,8 @@ def upload(client, teacher, exam_id, filename, data, path="upload-question-paper
                        files={"file": (filename, data, "application/octet-stream")})
 
 
-def build_ready_exam(client: TestClient, teacher: dict) -> dict:
-    exam = create_exam(client, teacher)
+def build_ready_exam(client: TestClient, teacher: dict, **overrides) -> dict:
+    exam = create_exam(client, teacher, **overrides)
     upload(client, teacher, exam["id"], "paper.pdf", make_pdf(PAPER_TEXT))
     exam = client.post(f"/api/exams/{exam['id']}/extract-questions", headers=auth(teacher), json={}).json()["exam"]
     for label, leaf in leaf_by_label(exam).items():
