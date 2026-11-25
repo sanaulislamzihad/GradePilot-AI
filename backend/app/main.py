@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api.routes import admin, auth, courses, dashboard, exams, health, public, student, users
+from app.api.routes import admin, auth, courses, dashboard, exams, health, public, student, submissions, users
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 
@@ -42,7 +42,7 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
 
-    for module in (health, auth, users, courses, exams, public, student, dashboard, admin):
+    for module in (health, auth, users, courses, exams, submissions, public, student, dashboard, admin):
         app.include_router(module.router, prefix=settings.api_prefix)
 
     return app

@@ -11,7 +11,9 @@ from app.core.errors import AppError
 from app.models.course import Course, CourseSection, SectionEnrollment
 from app.models.user import User
 from app.schemas.course import JoinSectionRequest, StudentEnrollment
+from app.schemas.submission import StudentExamDetail, StudentExamItem
 from app.services import audit
+from app.services import submission_service
 from app.services.course_service import join_section
 
 router = APIRouter(prefix="/student", tags=["student"])
@@ -70,3 +72,16 @@ def leave(enrollment_id: uuid.UUID, student: StudentUser, db: DbSession, client:
     db.delete(enrollment)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/exams", response_model=list[StudentExamItem])
+def available_exams(student: StudentUser, db: DbSession) -> list[StudentExamItem]:
+    """Published exams for the student's sections and any exam they have submitted to."""
+    return submission_service.available_exams(db, student)
+
+
+@router.get("/exams/{slug}", response_model=StudentExamDetail)
+def exam_for_student(slug: str, student: StudentUser, db: DbSession) -> StudentExamDetail:
+    """Any published exam reachable by its link, with this student's eligibility and attempts."""
+    exam = submission_service.published_exam_by_slug(db, slug)
+    return submission_service.exam_detail(db, exam, student)

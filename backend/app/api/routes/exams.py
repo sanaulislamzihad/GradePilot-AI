@@ -24,6 +24,7 @@ from app.models.exam import (
     Rubric,
     RubricCriterion,
 )
+from app.models.submission import Submission
 from app.schemas.common import Page
 from app.schemas.exam import (
     ExamCreate,
@@ -44,6 +45,7 @@ from app.services import audit, storage
 from app.services import exam_service as svc
 from app.services.document_text import extract_text
 from app.services.question_parser import flatten_answers, parse_parts
+from app.services.submission_service import submission_counts
 from app.services.uploads import read_validated
 
 router = APIRouter(tags=["exams"])
@@ -87,7 +89,11 @@ def list_exams(
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
-    return Page(items=[svc.summary(e) for e in exams], total=total, page=page, page_size=page_size)
+    counts = submission_counts(db, [e.id for e in exams])
+    return Page(
+        items=[svc.summary(e, submission_count=counts.get(e.id, 0)) for e in exams],
+        total=total, page=page, page_size=page_size,
+    )
 
 
 @router.post("/exams", response_model=ExamDetail, status_code=status.HTTP_201_CREATED)
@@ -501,6 +507,8 @@ def unpublish_exam(exam_id: uuid.UUID, teacher: TeacherUser, db: DbSession, clie
     exam = svc.get_owned_exam(db, teacher, exam_id)
     if exam.status != ExamStatus.PUBLISHED.value:
         raise AppError(409, "This exam is not published")
+    if db.scalar(select(Submission.id).where(Submission.exam_id == exam.id)):
+        raise AppError(409, "Students have already submitted scripts, so this exam can no longer be unpublished.")
     exam.status = ExamStatus.DRAFT.value
     _record(db, teacher, "exam.unpublish", exam, client)
     db.commit()

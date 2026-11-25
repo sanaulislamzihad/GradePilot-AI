@@ -38,6 +38,7 @@ _SUMMARIES: dict[str, str] = {
     "exam.model_answer_upload": "Uploaded model answers for {title}",
     "exam.publish": "Published exam {title}",
     "exam.unpublish": "Unpublished exam {title}",
+    "submission.create": "Submitted attempt {attempt} for {title} ({code})",
     "enrollment.leave": "Left {code} section {section}",
 }
 

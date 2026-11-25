@@ -13,6 +13,7 @@ from app.core.errors import AppError
 from app.database.base import as_utc, utcnow
 from app.models.course import Course, CourseSection
 from app.models.exam import Exam, ExamDocument, ExamStatus, ModelAnswer, Question, Rubric
+from app.models.submission import Submission
 from app.models.user import User
 from app.schemas.exam import (
     CriterionRead,
@@ -269,7 +270,7 @@ def _question_read(question: Question, parent_label: str | None) -> QuestionRead
     )
 
 
-def summary(exam: Exam, question_count: int | None = None) -> ExamSummary:
+def summary(exam: Exam, question_count: int | None = None, submission_count: int = 0) -> ExamSummary:
     return ExamSummary(
         id=exam.id,
         title=exam.title,
@@ -284,6 +285,7 @@ def summary(exam: Exam, question_count: int | None = None) -> ExamSummary:
         exam_date=exam.exam_date,
         submission_deadline=exam.submission_deadline,
         question_count=question_count if question_count is not None else sum(1 for _ in leaves(exam)),
+        submission_count=submission_count,
         created_at=exam.created_at,
         updated_at=exam.updated_at,
         published_at=exam.published_at,
@@ -296,8 +298,11 @@ def detail(db: Session, exam_id: uuid.UUID) -> ExamDetail:
     exam = db.scalar(select(Exam).where(Exam.id == exam_id).options(*_EXAM_LOAD))
     assert exam is not None
     documents = sorted(exam.documents, key=lambda d: d.created_at, reverse=True)
+    submissions = db.scalar(
+        select(func.count(Submission.id)).where(Submission.exam_id == exam.id, Submission.is_latest.is_(True))
+    ) or 0
     return ExamDetail(
-        **summary(exam).model_dump(),
+        **summary(exam, submission_count=submissions).model_dump(),
         instructions=exam.instructions,
         allowed_formats=exam.allowed_formats,
         max_file_size_mb=exam.max_file_size_mb,
