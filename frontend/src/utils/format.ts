@@ -45,3 +45,51 @@ export function initials(name: string): string {
 }
 
 export const roleLabel = { admin: 'Administrator', teacher: 'Teacher', student: 'Student' } as const
+
+export const examTypeLabel = { quiz: 'Quiz', assignment: 'Assignment', midterm: 'Midterm', final: 'Final' } as const
+
+export const questionTypeLabel = {
+  short: 'Short answer',
+  descriptive: 'Descriptive',
+  mathematical: 'Mathematical',
+  multiple_choice: 'Multiple choice',
+} as const
+
+/** 5 -> "5", 2.5 -> "2.5", null -> "—" */
+export function formatMarks(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—'
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)))
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/** ISO timestamp -> value for <input type="datetime-local"> in the viewer's timezone. */
+export function toLocalInput(iso: string | null): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  const offset = date.getTimezoneOffset() * 60_000
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
+}
+
+/** <input type="datetime-local"> value (local time) -> ISO timestamp with timezone. */
+export function fromLocalInput(value: string): string | null {
+  return value ? new Date(value).toISOString() : null
+}
+
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+/** True for numbers with at most two decimal places, tolerant of floating-point noise. */
+export function hasTwoDecimalsAtMost(value: number): boolean {
+  return Math.abs(value * 100 - Math.round(value * 100)) < 1e-6
+}

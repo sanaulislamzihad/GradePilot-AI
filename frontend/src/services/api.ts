@@ -5,7 +5,14 @@ import type {
   Course,
   CourseDetail,
   EnrolledStudent,
+  ExamDetail,
+  ExamSummary,
+  ExamStatus,
+  ExamType,
+  ModelAnswerUploadResult,
   Page,
+  PublicExam,
+  QuestionType,
   Section,
   StudentDashboard,
   StudentEnrollment,
@@ -93,4 +100,85 @@ export const adminApi = {
   auditLogs: (params: { action?: string; page?: number; page_size?: number }) =>
     data(http.get<Page<AuditLogEntry>>('/admin/audit-logs', { params })),
   system: () => data(http.get<SystemStatus>('/admin/system')),
+}
+
+export interface ExamPayload {
+  title: string
+  exam_type: ExamType
+  course_id: string | null
+  section_id: string | null
+  exam_date: string | null
+  submission_deadline: string | null
+  total_marks: number
+  instructions: string | null
+  allowed_formats: string[]
+  max_file_size_mb: number
+  max_attempts: number
+}
+
+export interface QuestionPayload {
+  label?: string
+  text?: string
+  question_type?: QuestionType
+  marks?: number | null
+  clear_marks?: boolean
+}
+
+export interface CriterionPayload {
+  name: string
+  description: string | null
+  max_marks: number
+}
+
+const upload = (url: string, file: File, params?: Record<string, unknown>) => {
+  const form = new FormData()
+  form.append('file', file)
+  return http.post(url, form, { params, timeout: 120_000 })
+}
+
+export const examApi = {
+  list: (params: { q?: string; status?: ExamStatus; page?: number; page_size?: number } = {}) =>
+    data(http.get<Page<ExamSummary>>('/exams', { params })),
+  get: (id: string) => data(http.get<ExamDetail>(`/exams/${id}`)),
+  create: (payload: ExamPayload) => data(http.post<ExamDetail>('/exams', payload)),
+  update: (id: string, payload: ExamPayload) => data(http.put<ExamDetail>(`/exams/${id}`, payload)),
+  remove: (id: string) => http.delete(`/exams/${id}`),
+
+  uploadQuestionPaper: (id: string, file: File) =>
+    upload(`/exams/${id}/upload-question-paper`, file).then((r) => r.data as ExamDetail),
+  extractQuestions: (id: string, replace: boolean) =>
+    data(http.post<{ created: number; with_marks: number; exam: ExamDetail }>(`/exams/${id}/extract-questions`, { replace })),
+  downloadDocument: (examId: string, documentId: string) =>
+    http.get<Blob>(`/exams/${examId}/documents/${documentId}`, { responseType: 'blob' }).then((r) => r.data),
+  removeDocument: (examId: string, documentId: string) =>
+    data(http.delete<ExamDetail>(`/exams/${examId}/documents/${documentId}`)),
+
+  addQuestion: (examId: string, payload: QuestionPayload & { parent_id?: string | null }) =>
+    data(http.post<ExamDetail>(`/exams/${examId}/questions`, payload)),
+  updateQuestion: (questionId: string, payload: QuestionPayload) =>
+    data(http.patch<ExamDetail>(`/questions/${questionId}`, payload)),
+  removeQuestion: (questionId: string) => data(http.delete<ExamDetail>(`/questions/${questionId}`)),
+  reorder: (examId: string, parentId: string | null, orderedIds: string[]) =>
+    data(http.post<ExamDetail>(`/exams/${examId}/questions/reorder`, { parent_id: parentId, ordered_ids: orderedIds })),
+  saveMarks: (examId: string, items: { question_id: string; marks: number | null }[]) =>
+    data(http.put<ExamDetail>(`/exams/${examId}/marks`, { items })),
+
+  saveModelAnswer: (questionId: string, content: string, approved: boolean) =>
+    data(http.put<ExamDetail>(`/questions/${questionId}/model-answer`, { content, approved })),
+  removeModelAnswer: (questionId: string) => data(http.delete<ExamDetail>(`/questions/${questionId}/model-answer`)),
+  uploadModelAnswers: (examId: string, file: File, overwriteApproved: boolean) =>
+    upload(`/exams/${examId}/model-answer`, file, { overwrite_approved: overwriteApproved }).then(
+      (r) => r.data as ModelAnswerUploadResult,
+    ),
+
+  saveRubric: (questionId: string, criteria: CriterionPayload[], approved: boolean) =>
+    data(http.put<ExamDetail>(`/questions/${questionId}/rubric`, { criteria, approved })),
+  removeRubric: (questionId: string) => data(http.delete<ExamDetail>(`/questions/${questionId}/rubric`)),
+
+  publish: (id: string) => data(http.post<ExamDetail>(`/exams/${id}/publish`)),
+  unpublish: (id: string) => data(http.post<ExamDetail>(`/exams/${id}/unpublish`)),
+}
+
+export const publicApi = {
+  exam: (slug: string) => data(http.get<PublicExam>(`/public/exams/${slug}`)),
 }
