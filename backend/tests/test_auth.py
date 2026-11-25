@@ -107,7 +107,7 @@ def test_refresh_rotates_and_detects_reuse(client: TestClient):
     # A replay right after rotation (a second tab) is refused without revoking anything,
     # and the browser cookie is left alone.
     stale = _refresh_with(client, first)
-    assert stale.status_code == 401 and "set-cookie" not in stale.headers
+    assert stale.status_code == 409 and "set-cookie" not in stale.headers
     again = _refresh_with(client, second)
     assert again.status_code == 200
     third = again.cookies.get(COOKIE)
@@ -129,9 +129,7 @@ def test_logout_revokes_refresh_token(client: TestClient):
     token = client.cookies.get(COOKIE)
     logout = client.post("/api/auth/logout")
     assert logout.status_code == 204 and f'{COOKIE}=""' in logout.headers["set-cookie"]
-    with SessionLocal() as db:
-        db.execute(update(RefreshToken).values(revoked_at=utcnow() - timedelta(minutes=5)))
-        db.commit()
+    # Immediately after logout, so this must not be treated as a concurrent-tab refresh.
     assert _refresh_with(client, token).status_code == 401
 
 
