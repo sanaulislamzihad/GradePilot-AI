@@ -22,11 +22,23 @@ class TeacherCourseSummary(BaseModel):
     student_count: int
 
 
+class TeacherExamSummary(BaseModel):
+    id: uuid.UUID
+    title: str
+    status: str
+    course_code: str | None
+    submission_deadline: datetime | None
+
+
 class TeacherDashboard(BaseModel):
     course_count: int
     section_count: int
     student_count: int
+    exam_count: int
+    published_exam_count: int
+    draft_exam_count: int
     courses: list[TeacherCourseSummary]
+    recent_exams: list[TeacherExamSummary]
     recent_activity: list[ActivityItem]
 
 

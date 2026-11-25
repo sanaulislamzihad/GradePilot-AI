@@ -118,3 +118,12 @@ def test_dashboards_reflect_database_state(client: TestClient, teacher, student,
 
     student_view = client.get("/api/dashboard/student", headers=auth(student)).json()
     assert student_view["enrollment_count"] == 2 and student_view["course_count"] == 2
+
+
+def test_teacher_dashboard_counts_exams(client: TestClient, teacher):
+    for title in ("Quiz 1", "Quiz 2"):
+        client.post("/api/exams", headers=auth(teacher), json={"title": title, "total_marks": 10})
+    dashboard = client.get("/api/dashboard/teacher", headers=auth(teacher)).json()
+    assert (dashboard["exam_count"], dashboard["draft_exam_count"], dashboard["published_exam_count"]) == (2, 2, 0)
+    assert [e["title"] for e in dashboard["recent_exams"]] == ["Quiz 2", "Quiz 1"]
+    assert dashboard["recent_activity"][0]["summary"] == "Created exam Quiz 2"

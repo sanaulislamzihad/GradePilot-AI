@@ -8,8 +8,15 @@ from app.api.deps import DbSession, StudentUser, TeacherUser
 from app.api.routes.student import list_student_enrollments
 from app.models.audit_log import AuditLog
 from app.models.course import Course, CourseSection, SectionEnrollment
+from app.models.exam import Exam, ExamStatus
 from app.models.user import User
-from app.schemas.dashboard import ActivityItem, StudentDashboard, TeacherCourseSummary, TeacherDashboard
+from app.schemas.dashboard import (
+    ActivityItem,
+    StudentDashboard,
+    TeacherCourseSummary,
+    TeacherDashboard,
+    TeacherExamSummary,
+)
 from app.services import audit
 from app.services.course_service import course_counts
 
@@ -47,10 +54,30 @@ def teacher_dashboard(teacher: TeacherUser, db: DbSession) -> TeacherDashboard:
         .where(Course.teacher_id == teacher.id)
     ) or 0
 
+    exam_status_counts = dict(
+        db.execute(
+            select(Exam.status, func.count(Exam.id)).where(Exam.teacher_id == teacher.id).group_by(Exam.status)
+        ).all()
+    )
+    recent_exams = db.scalars(
+        select(Exam).where(Exam.teacher_id == teacher.id).order_by(Exam.updated_at.desc()).limit(5)
+    ).all()
+
     return TeacherDashboard(
         course_count=len(courses),
         section_count=section_count,
         student_count=student_count,
+        exam_count=sum(exam_status_counts.values()),
+        published_exam_count=exam_status_counts.get(ExamStatus.PUBLISHED.value, 0),
+        draft_exam_count=exam_status_counts.get(ExamStatus.DRAFT.value, 0),
+        recent_exams=[
+            TeacherExamSummary(
+                id=e.id, title=e.title, status=e.status,
+                course_code=e.course.code if e.course else None,
+                submission_deadline=e.submission_deadline,
+            )
+            for e in recent_exams
+        ],
         courses=[
             TeacherCourseSummary(
                 id=c.id,

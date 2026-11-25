@@ -16,6 +16,7 @@ from app.core.errors import AppError
 from app.database.base import utcnow
 from app.models.audit_log import AuditLog
 from app.models.course import Course, CourseSection, SectionEnrollment
+from app.models.exam import Exam
 from app.models.user import RefreshToken, User, UserRole
 from app.schemas.common import Page
 from app.schemas.dashboard import AdminOverview, AuditLogRead, SystemStatus
@@ -87,8 +88,11 @@ def update_user(
     if new_role is not None and new_role != target.role:
         if new_role == UserRole.STUDENT and not target.student_id:
             raise AppError(400, "This user has no student ID, so they cannot become a student")
-        if target.role == UserRole.TEACHER and db.scalar(select(Course.id).where(Course.teacher_id == target.id)):
-            raise AppError(409, "This teacher still owns courses. Delete or reassign them first.")
+        if target.role == UserRole.TEACHER and (
+            db.scalar(select(Course.id).where(Course.teacher_id == target.id))
+            or db.scalar(select(Exam.id).where(Exam.teacher_id == target.id))
+        ):
+            raise AppError(409, "This teacher still owns courses or exams. Delete them first.")
         if target.role == UserRole.STUDENT:
             for enrollment in db.scalars(select(SectionEnrollment).where(SectionEnrollment.student_id == target.id)):
                 db.delete(enrollment)
