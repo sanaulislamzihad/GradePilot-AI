@@ -179,6 +179,20 @@ export function PublishStep() {
       </Card>
 
       {exam.status === 'published' && exam.public_slug && <ShareLink exam={exam} />}
+      {exam.status === 'published' && (
+        <Card>
+          <CardBody className="flex items-center justify-between gap-4">
+            <p className="text-sm text-zinc-700">
+              <span className="font-semibold text-zinc-900 tabular-nums">{exam.submission_count}</span> student
+              {exam.submission_count === 1 ? ' has' : 's have'} submitted.
+              {exam.submission_count > 0 && ' The exam can no longer be unpublished.'}
+            </p>
+            <Link to={`/teacher/submissions?exam=${exam.id}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              View submissions
+            </Link>
+          </CardBody>
+        </Card>
+      )}
       {exam.questions.length > 0 && <PaperPreview exam={exam} />}
 
       <ConfirmDialog

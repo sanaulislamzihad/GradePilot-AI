@@ -1,8 +1,10 @@
 import {
   BookOpen,
+  ClipboardList,
   FilePlus2,
   FileText,
   GraduationCap,
+  Inbox,
   LayoutDashboard,
   ScrollText,
   Server,
@@ -22,20 +24,23 @@ export interface NavItem {
 }
 
 /**
- * Only implemented pages appear here. Modules from later phases (submissions,
- * evaluation, results, analytics, AI settings) are added to this list when they
- * ship, so no menu entry ever leads to a placeholder.
+ * Only implemented pages appear here. Modules from later phases (AI evaluation,
+ * results, analytics, AI settings) are added to this list when they ship, so no
+ * menu entry ever leads to a placeholder.
  */
 export const navigation: Record<UserRole, NavItem[]> = {
   teacher: [
     { label: 'Dashboard', to: '/teacher', icon: LayoutDashboard, end: true },
     { label: 'My Exams', to: '/teacher/exams', icon: FileText, matchExclude: '/teacher/exams/new' },
     { label: 'Create Exam', to: '/teacher/exams/new', icon: FilePlus2 },
+    { label: 'Submissions', to: '/teacher/submissions', icon: Inbox },
     { label: 'Courses', to: '/teacher/courses', icon: BookOpen },
     { label: 'Profile', to: '/teacher/profile', icon: UserCircle },
   ],
   student: [
     { label: 'Dashboard', to: '/student', icon: LayoutDashboard, end: true },
+    { label: 'Available Exams', to: '/student/exams', icon: ClipboardList },
+    { label: 'My Submissions', to: '/student/submissions', icon: Inbox },
     { label: 'My Courses', to: '/student/courses', icon: GraduationCap },
     { label: 'Profile', to: '/student/profile', icon: UserCircle },
   ],

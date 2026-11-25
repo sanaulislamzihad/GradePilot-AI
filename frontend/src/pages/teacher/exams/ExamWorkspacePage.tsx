@@ -100,11 +100,15 @@ export default function ExamWorkspacePage() {
         <div className="mb-6 flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-2 text-sm text-zinc-700">
             <Lock className="size-4 text-zinc-500" aria-hidden />
-            This exam is published and locked. Unpublish it to make changes.
+            {exam.submission_count > 0
+              ? 'This exam is published and locked. Students have submitted scripts, so it can no longer be changed.'
+              : 'This exam is published and locked. Unpublish it to make changes.'}
           </p>
-          <Button variant="secondary" size="sm" onClick={unpublish} loading={unpublishing}>
-            Unpublish to edit
-          </Button>
+          {exam.submission_count === 0 && (
+            <Button variant="secondary" size="sm" onClick={unpublish} loading={unpublishing}>
+              Unpublish to edit
+            </Button>
+          )}
         </div>
       )}
 

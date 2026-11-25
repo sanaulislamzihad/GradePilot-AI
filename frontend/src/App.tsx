@@ -19,6 +19,11 @@ const CreateExamPage = lazy(() => import('@/pages/teacher/exams/CreateExamPage')
 const ExamWorkspacePage = lazy(() => import('@/pages/teacher/exams/ExamWorkspacePage'))
 const StudentDashboard = lazy(() => import('@/pages/student/StudentDashboard'))
 const StudentCoursesPage = lazy(() => import('@/pages/student/StudentCoursesPage'))
+const AvailableExamsPage = lazy(() => import('@/pages/student/AvailableExamsPage'))
+const StudentExamPage = lazy(() => import('@/pages/student/StudentExamPage'))
+const MySubmissionsPage = lazy(() => import('@/pages/student/MySubmissionsPage'))
+const SubmissionDetailPage = lazy(() => import('@/pages/shared/SubmissionDetailPage'))
+const SubmissionsPage = lazy(() => import('@/pages/teacher/SubmissionsPage'))
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'))
 const UsersPage = lazy(() => import('@/pages/admin/UsersPage'))
 const AuditLogPage = lazy(() => import('@/pages/admin/AuditLogPage'))
@@ -44,6 +49,8 @@ export default function App() {
             <Route path="exams" element={<ExamsPage />} />
             <Route path="exams/new" element={<CreateExamPage />} />
             <Route path="exams/:examId/:step?" element={<ExamWorkspacePage />} />
+            <Route path="submissions" element={<SubmissionsPage />} />
+            <Route path="submissions/:submissionId" element={<SubmissionDetailPage />} />
             <Route path="profile" element={<ProfilePage />} />
           </Route>
         </Route>
@@ -52,6 +59,10 @@ export default function App() {
           <Route path="/student" element={<AppLayout />}>
             <Route index element={<StudentDashboard />} />
             <Route path="courses" element={<StudentCoursesPage />} />
+            <Route path="exams" element={<AvailableExamsPage />} />
+            <Route path="exams/:slug" element={<StudentExamPage />} />
+            <Route path="submissions" element={<MySubmissionsPage />} />
+            <Route path="submissions/:submissionId" element={<SubmissionDetailPage />} />
             <Route path="profile" element={<ProfilePage />} />
           </Route>
         </Route>

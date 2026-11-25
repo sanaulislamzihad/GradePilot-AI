@@ -100,6 +100,7 @@ export default function ExamsPage() {
                   <TH className="hidden sm:table-cell">Type</TH>
                   <TH className="text-right">Questions</TH>
                   <TH className="text-right">Marks</TH>
+                  <TH className="hidden text-right md:table-cell">Submissions</TH>
                   <TH>Status</TH>
                   <TH className="hidden lg:table-cell">Deadline</TH>
                 </tr>
@@ -125,6 +126,7 @@ export default function ExamsPage() {
                     <TD className="hidden sm:table-cell">{examTypeLabel[exam.exam_type]}</TD>
                     <TD className="text-right tabular-nums">{exam.question_count}</TD>
                     <TD className="text-right tabular-nums">{formatMarks(exam.total_marks)}</TD>
+                    <TD className="hidden text-right tabular-nums md:table-cell">{exam.status === 'published' ? exam.submission_count : '—'}</TD>
                     <TD>
                       <ExamStatusBadge status={exam.status} />
                     </TD>

@@ -1,4 +1,4 @@
-import { BookOpen, FileText, Layers, Plus, Users } from 'lucide-react'
+import { BookOpen, FileText, Inbox, Plus, Users } from 'lucide-react'
 import { Link } from 'react-router'
 import { ActivityList } from '@/components/ActivityList'
 import { buttonVariants } from '@/components/ui/Button'
@@ -41,8 +41,8 @@ export default function TeacherDashboard() {
               icon={FileText}
               hint={`${data.published_exam_count} published · ${data.draft_exam_count} draft`}
             />
-            <StatCard label="Courses" value={data.course_count} icon={BookOpen} />
-            <StatCard label="Sections" value={data.section_count} icon={Layers} />
+            <StatCard label="Submissions" value={data.submission_count} icon={Inbox} hint="Current script per student" />
+            <StatCard label="Courses" value={data.course_count} icon={BookOpen} hint={`${data.section_count} sections`} />
             <StatCard label="Enrolled students" value={data.student_count} icon={Users} hint="Counted once across courses" />
           </div>
 

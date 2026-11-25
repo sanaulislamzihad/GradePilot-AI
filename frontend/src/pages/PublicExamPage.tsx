@@ -2,6 +2,7 @@ import { CalendarClock, FileUp, Repeat, User } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { Logo } from '@/components/Logo'
 import { StatusBadge } from '@/components/ui/Badge'
+import { buttonVariants } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { ErrorState, LoadingState } from '@/components/ui/States'
 import { useAsync } from '@/hooks/useAsync'
@@ -101,9 +102,22 @@ export default function PublicExamPage() {
               </Card>
             )}
 
-            <p className="text-center text-[13px] text-zinc-500">
-              Online answer script upload is not available on this page yet. Follow your teacher's instructions to submit.
-            </p>
+            <Card>
+              <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-zinc-700">
+                  {user?.role === 'student'
+                    ? 'Upload your answer script from your student account.'
+                    : user
+                      ? 'Students submit their answer scripts after signing in with a student account.'
+                      : 'Sign in with your student account to submit your answer script.'}
+                </p>
+                {(!user || user.role === 'student') && (
+                  <Link to={`/student/exams/${slug}`} className={buttonVariants({ className: 'shrink-0' })}>
+                    {user ? 'Open submission page' : 'Sign in to submit'}
+                  </Link>
+                )}
+              </CardBody>
+            </Card>
           </div>
         )}
       </main>
