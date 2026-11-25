@@ -1,6 +1,13 @@
+from datetime import timedelta
+
 from fastapi.testclient import TestClient
+from sqlalchemy import update
 
 from app.core.config import get_settings
+from app.database.base import utcnow
+from app.database.session import SessionLocal
+from app.models.user import RefreshToken
+from app.security.tokens import hash_refresh_token
 from tests.conftest import PASSWORD, auth, register
 
 COOKIE = get_settings().refresh_cookie_name
@@ -82,28 +89,50 @@ def test_me_requires_valid_token(client: TestClient):
     assert client.get("/api/auth/me", headers=auth(session)).json()["id"] == session["user"]["id"]
 
 
+def _refresh_with(client: TestClient, token: str):
+    """Send a specific refresh token, bypassing the client's cookie jar."""
+    client.cookies.clear()
+    return client.post("/api/auth/refresh", headers={"Cookie": f"{COOKIE}={token}"})
+
+
 def test_refresh_rotates_and_detects_reuse(client: TestClient):
     register(client)
-    first_cookie = client.cookies.get(COOKIE)
+    first = client.cookies.get(COOKIE)
 
-    rotated = client.post("/api/auth/refresh")
+    rotated = _refresh_with(client, first)
     assert rotated.status_code == 200
-    second_cookie = client.cookies.get(COOKIE)
-    assert second_cookie and second_cookie != first_cookie
+    second = rotated.cookies.get(COOKIE)
+    assert second and second != first
 
-    # Replaying the old token revokes the whole family, including the new token.
-    client.cookies.set(COOKIE, first_cookie, path="/api/auth")
-    assert client.post("/api/auth/refresh").status_code == 401
-    client.cookies.set(COOKIE, second_cookie, path="/api/auth")
-    assert client.post("/api/auth/refresh").status_code == 401
+    # A replay right after rotation (a second tab) is refused without revoking anything,
+    # and the browser cookie is left alone.
+    stale = _refresh_with(client, first)
+    assert stale.status_code == 401 and "set-cookie" not in stale.headers
+    again = _refresh_with(client, second)
+    assert again.status_code == 200
+    third = again.cookies.get(COOKIE)
+
+    # Outside the grace period, replaying an old token revokes the whole family.
+    with SessionLocal() as db:
+        db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.token_hash == hash_refresh_token(first))
+            .values(revoked_at=utcnow() - timedelta(minutes=5))
+        )
+        db.commit()
+    assert _refresh_with(client, first).status_code == 401
+    assert _refresh_with(client, third).status_code == 401
 
 
 def test_logout_revokes_refresh_token(client: TestClient):
     register(client)
     token = client.cookies.get(COOKIE)
-    assert client.post("/api/auth/logout").status_code == 204
-    client.cookies.set(COOKIE, token, path="/api/auth")
-    assert client.post("/api/auth/refresh").status_code == 401
+    logout = client.post("/api/auth/logout")
+    assert logout.status_code == 204 and f'{COOKIE}=""' in logout.headers["set-cookie"]
+    with SessionLocal() as db:
+        db.execute(update(RefreshToken).values(revoked_at=utcnow() - timedelta(minutes=5)))
+        db.commit()
+    assert _refresh_with(client, token).status_code == 401
 
 
 def test_password_change_signs_out_other_sessions(make_client):
