@@ -9,6 +9,7 @@ from app.api.routes.student import list_student_enrollments
 from app.models.audit_log import AuditLog
 from app.models.course import Course, CourseSection, SectionEnrollment
 from app.models.exam import Exam, ExamStatus
+from app.models.submission import Submission
 from app.models.user import User
 from app.schemas.dashboard import (
     ActivityItem,
@@ -19,6 +20,7 @@ from app.schemas.dashboard import (
 )
 from app.services import audit
 from app.services.course_service import course_counts
+from app.services.submission_service import available_exams
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -70,6 +72,11 @@ def teacher_dashboard(teacher: TeacherUser, db: DbSession) -> TeacherDashboard:
         exam_count=sum(exam_status_counts.values()),
         published_exam_count=exam_status_counts.get(ExamStatus.PUBLISHED.value, 0),
         draft_exam_count=exam_status_counts.get(ExamStatus.DRAFT.value, 0),
+        submission_count=db.scalar(
+            select(func.count(Submission.id))
+            .join(Exam, Submission.exam_id == Exam.id)
+            .where(Exam.teacher_id == teacher.id, Submission.is_latest.is_(True))
+        ) or 0,
         recent_exams=[
             TeacherExamSummary(
                 id=e.id, title=e.title, status=e.status,
@@ -95,9 +102,14 @@ def teacher_dashboard(teacher: TeacherUser, db: DbSession) -> TeacherDashboard:
 @router.get("/student", response_model=StudentDashboard)
 def student_dashboard(student: StudentUser, db: DbSession) -> StudentDashboard:
     enrollments = list_student_enrollments(db, student)
+    exams = available_exams(db, student)
     return StudentDashboard(
         enrollment_count=len(enrollments),
         course_count=len({e.course_id for e in enrollments}),
+        available_exam_count=len(exams),
+        submitted_exam_count=sum(1 for e in exams if e.latest_submission is not None),
+        # Open exams still waiting for a script, soonest deadline first.
+        upcoming_exams=[e for e in exams if e.is_open and e.latest_submission is None][:5],
         enrollments=enrollments,
         recent_activity=recent_activity(db, student),
     )
