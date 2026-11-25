@@ -7,7 +7,7 @@ A feature is marked done only when it is implemented, tested and working end to 
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 1 | Foundation: setup, database, authentication, roles, dashboards | ✅ Done |
-| 2 | Exam management | ⬜ |
+| 2 | Exam management: creation, question paper, questions, marks, answers, rubrics, publishing | ✅ Done |
 | 3 | Student submission | ⬜ |
 | 4 | AI integration | ⬜ |
 | 5 | Advanced evaluation | ⬜ |
@@ -78,14 +78,57 @@ A feature is marked done only when it is implemented, tested and working end to 
 
 ---
 
-## Phase 2 — Exam management ⬜
-- ⬜ Exam model and multi-step creation wizard (information, deadlines, policies)
-- ⬜ Question paper upload (PDF, DOCX, images) with secure private storage
-- ⬜ Text extraction (PyMuPDF, python-docx) and editable question list
-- ⬜ Mark allocation with total validation
-- ⬜ Model answers (upload or AI draft with approval)
-- ⬜ Rubric editor with per-question total validation
-- ⬜ Draft, preview, publish, unique exam link and QR code
+## Phase 2 — Exam management ✅
+
+### Database
+- ✅ `exams`, `questions` (with one level of sub-questions), `model_answers`, `rubrics`,
+  `rubric_criteria`, `exam_documents`; Alembic migration verified on SQLite and rendered for PostgreSQL
+- ✅ Exact decimal marks; string-backed enums so new values need no PostgreSQL type change
+
+### Exam creation
+- ✅ Seven-step workspace: details → question paper → questions → marks → model answers → rubrics → publish
+- ✅ Exam information: title, type, course and section (ownership-checked), exam date,
+  deadline, total marks, instructions, allowed formats, maximum file size, maximum attempts
+- ✅ Exam list with search, status filter and pagination; teacher dashboard exam counts
+
+### Question paper
+- ✅ Upload PDF, DOCX, JPG, JPEG, PNG with backend validation (extension, magic bytes,
+  image decoding, zip-bomb guard, 20 MB limit) and randomised private storage
+- ✅ Direct text extraction from digital PDFs (PyMuPDF) and DOCX (python-docx)
+- ✅ Scanned PDFs and images detected and stored as *needs OCR* — nothing is guessed
+- ✅ Rule-based detection of question numbers, sub-questions, printed marks and question type
+- ✅ Re-extraction requires explicit confirmation before replacing edited questions
+- ✅ Authorised download; replaced and deleted files removed from storage
+
+### Questions, marks, model answers and rubrics
+- ✅ Edit label, text and type; add, delete, reorder; split a question into parts
+- ✅ Marks on gradable questions; parent marks are the sum of their parts; total validated
+- ✅ Model answers per question with draft / approve; edits reset approval
+- ✅ Model answer document import mapped by question number, with a matching report
+- ✅ Rubric criteria editor; approval only when criteria add up to the question marks;
+  later mark changes invalidate the approval for publishing
+
+### Publication
+- ✅ Readiness checklist (details, questions, marks, model answers, rubrics) enforced on the server
+- ✅ Publish / unpublish; published exams are locked against every change
+- ✅ Unguessable shareable link, QR code generated in the browser with PNG download
+- ✅ Public exam page with details only (no questions, answers or rubrics)
+- ✅ Teacher preview of the full paper
+
+### Tests
+- ✅ Backend: 92 tests in total — parser unit tests, uploads (valid, spoofed, empty, corrupt,
+  oversized), extraction, question editing, marks, model answers, rubrics, publishing,
+  locking, public link and ownership
+- ✅ Frontend: 24 tests in total — marks totals, rubric approval rule, publish readiness, helpers
+- ✅ Full workflow run in a real browser (Edge): create → upload PDF → extract → marks →
+  import model answers from DOCX → approve → rubrics → publish → public page
+
+### Deferred to later phases (by design)
+- AI extraction for scanned papers and handwriting, AI-drafted model answers and AI-suggested
+  rubrics need the AI provider integration (Phase 4). No placeholder buttons are shown for them.
+- Students listing available exams in their dashboard and uploading scripts from the exam
+  link arrive with Phase 3. The public page currently states that online upload is not yet available.
+- Unpublishing will be blocked once an exam has submissions (Phase 3).
 
 ## Phase 3 — Student submission ⬜
 - ⬜ Exam access by link or dashboard; available exams for enrolled sections
