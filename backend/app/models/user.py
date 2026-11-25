@@ -2,10 +2,10 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, true
+from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database.base import Base, Timestamps, UUIDPrimaryKey, utcnow
+from app.database.base import Base, UTCDateTime, Timestamps, UUIDPrimaryKey, utcnow
 
 
 class UserRole(str, enum.Enum):
@@ -32,7 +32,7 @@ class User(UUIDPrimaryKey, Timestamps, Base):
     # Bumped whenever existing sessions must stop working (password change,
     # deactivation, role change). Access tokens carry the version they were issued with.
     token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
@@ -51,9 +51,9 @@ class RefreshToken(UUIDPrimaryKey, Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     family_id: Mapped[uuid.UUID] = mapped_column(index=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
 

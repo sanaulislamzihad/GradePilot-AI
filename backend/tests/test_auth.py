@@ -171,3 +171,12 @@ def test_login_is_rate_limited(client: TestClient):
     blocked = client.post("/api/auth/login", json={"email": "x@example.edu", "password": "Wrong1234"})
     assert blocked.status_code == 429
     assert "Retry-After" in blocked.headers
+
+
+def test_timestamps_loaded_from_database_are_utc(client: TestClient):
+    session = register(client)
+    client.post("/api/auth/login", json={"email": session["user"]["email"], "password": PASSWORD})
+    # /me reads the row back in a fresh session, where SQLite would drop the offset.
+    me = client.get("/api/auth/me", headers=auth(session)).json()
+    for field in ("created_at", "last_login_at"):
+        assert me[field].endswith(("Z", "+00:00")), me[field]

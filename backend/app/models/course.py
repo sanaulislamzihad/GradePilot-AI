@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, true
+from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database.base import Base, Timestamps, UUIDPrimaryKey, utcnow
+from app.database.base import Base, UTCDateTime, Timestamps, UUIDPrimaryKey, utcnow
 from app.models.user import User
 
 
@@ -49,7 +49,7 @@ class SectionEnrollment(UUIDPrimaryKey, Base):
         ForeignKey("course_sections.id", ondelete="CASCADE"), index=True
     )
     student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    joined_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
     section: Mapped[CourseSection] = relationship(back_populates="enrollments")
     student: Mapped[User] = relationship()

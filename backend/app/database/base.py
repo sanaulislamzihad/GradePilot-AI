@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, MetaData, Uuid, func
+from sqlalchemy import DateTime, MetaData, TypeDecorator, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # Stable constraint names keep Alembic migrations identical on SQLite and PostgreSQL.
@@ -25,8 +25,28 @@ def as_utc(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
+class UTCDateTime(TypeDecorator[datetime]):
+    """Timezone-aware datetime that always comes back from the database in UTC.
+
+    PostgreSQL keeps the offset, but SQLite drops it, which would make the API
+    emit naive timestamps that browsers misread as local time.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect) -> datetime | None:
+        if value is None:
+            return None
+        return as_utc(value).astimezone(UTC)
+
+    def process_result_value(self, value: datetime | None, dialect) -> datetime | None:
+        return None if value is None else as_utc(value).astimezone(UTC)
+
+
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
+    type_annotation_map = {datetime: UTCDateTime}
 
 
 class UUIDPrimaryKey:
@@ -35,10 +55,10 @@ class UUIDPrimaryKey:
 
 class Timestamps:
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime, default=utcnow, server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime,
         default=utcnow,
         onupdate=utcnow,
         server_default=func.now(),
