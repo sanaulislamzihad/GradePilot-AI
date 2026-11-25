@@ -1,4 +1,4 @@
-import { BookOpen, Layers, Plus, Users } from 'lucide-react'
+import { BookOpen, FileText, Layers, Plus, Users } from 'lucide-react'
 import { Link } from 'react-router'
 import { ActivityList } from '@/components/ActivityList'
 import { buttonVariants } from '@/components/ui/Button'
@@ -9,6 +9,8 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/States'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
 import { dashboardApi } from '@/services/api'
+import { formatDateTime } from '@/utils/format'
+import { ExamStatusBadge } from './exams/ExamStatusBadge'
 
 export default function TeacherDashboard() {
   const { user } = useAuth()
@@ -20,8 +22,8 @@ export default function TeacherDashboard() {
         title={`Welcome, ${user?.full_name.split(' ')[0] ?? ''}`}
         description="An overview of your courses and recent activity."
         actions={
-          <Link to="/teacher/courses?new=1" className={buttonVariants()}>
-            <Plus /> New course
+          <Link to="/teacher/exams/new" className={buttonVariants()}>
+            <Plus /> Create exam
           </Link>
         }
       />
@@ -32,11 +34,59 @@ export default function TeacherDashboard() {
         <ErrorState message={error} onRetry={reload} />
       ) : data ? (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="Exams"
+              value={data.exam_count}
+              icon={FileText}
+              hint={`${data.published_exam_count} published · ${data.draft_exam_count} draft`}
+            />
             <StatCard label="Courses" value={data.course_count} icon={BookOpen} />
             <StatCard label="Sections" value={data.section_count} icon={Layers} />
             <StatCard label="Enrolled students" value={data.student_count} icon={Users} hint="Counted once across courses" />
           </div>
+
+          <Card>
+            <CardHeader
+              title="Recent exams"
+              action={
+                data.exam_count > 0 && (
+                  <Link to="/teacher/exams" className="text-sm font-medium text-zinc-600 hover:text-zinc-900">
+                    View all
+                  </Link>
+                )
+              }
+            />
+            {data.recent_exams.length === 0 ? (
+              <EmptyState
+                icon={FileText}
+                title="No exams yet"
+                description="Create an exam, add the question paper, marks, model answers and rubrics, then publish it."
+                action={
+                  <Link to="/teacher/exams/new" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                    <Plus /> Create exam
+                  </Link>
+                }
+              />
+            ) : (
+              <ul className="divide-y divide-zinc-100">
+                {data.recent_exams.map((exam) => (
+                  <li key={exam.id}>
+                    <Link to={`/teacher/exams/${exam.id}`} className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-zinc-50">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-zinc-900">{exam.title}</p>
+                        <p className="text-xs text-zinc-500">
+                          {exam.course_code && <span className="font-mono">{exam.course_code} · </span>}
+                          Deadline {formatDateTime(exam.submission_deadline)}
+                        </p>
+                      </div>
+                      <ExamStatusBadge status={exam.status} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
 
           <div className="grid gap-6 lg:grid-cols-5">
             <Card className="lg:col-span-3">

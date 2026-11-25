@@ -12,6 +12,7 @@ import { initials, roleLabel } from '@/utils/format'
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   if (!user) return null
 
   const signOut = async () => {
@@ -32,7 +33,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <p className="px-2 pt-1 pb-2 text-[11px] font-medium tracking-wider text-zinc-400 uppercase">
           {roleLabel[user.role]}
         </p>
-        {navigation[user.role].map(({ label, to, icon: Icon, end }) => (
+        {navigation[user.role].map(({ label, to, icon: Icon, end, matchExclude }) => (
           <NavLink
             key={to}
             to={to}
@@ -41,7 +42,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
-                isActive ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
+                isActive && !(matchExclude && pathname.startsWith(matchExclude))
+                  ? 'bg-zinc-900 text-white'
+                  : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
               )
             }
           >

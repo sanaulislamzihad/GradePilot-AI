@@ -1,5 +1,7 @@
 import {
   BookOpen,
+  FilePlus2,
+  FileText,
   GraduationCap,
   LayoutDashboard,
   ScrollText,
@@ -15,16 +17,20 @@ export interface NavItem {
   to: string
   icon: LucideIcon
   end?: boolean
+  /** A sub-path that has its own menu entry and should not also highlight this one. */
+  matchExclude?: string
 }
 
 /**
- * Only implemented pages appear here. Modules from later phases (exams,
- * submissions, evaluation, results, analytics, AI settings) are added to this
- * list when they ship, so no menu entry ever leads to a placeholder.
+ * Only implemented pages appear here. Modules from later phases (submissions,
+ * evaluation, results, analytics, AI settings) are added to this list when they
+ * ship, so no menu entry ever leads to a placeholder.
  */
 export const navigation: Record<UserRole, NavItem[]> = {
   teacher: [
     { label: 'Dashboard', to: '/teacher', icon: LayoutDashboard, end: true },
+    { label: 'My Exams', to: '/teacher/exams', icon: FileText, matchExclude: '/teacher/exams/new' },
+    { label: 'Create Exam', to: '/teacher/exams/new', icon: FilePlus2 },
     { label: 'Courses', to: '/teacher/courses', icon: BookOpen },
     { label: 'Profile', to: '/teacher/profile', icon: UserCircle },
   ],
