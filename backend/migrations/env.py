@@ -7,7 +7,7 @@ from sqlalchemy import engine_from_config, pool
 
 import app.models  # noqa: F401  (registers every table on Base.metadata)
 from app.core.config import get_settings
-from app.database.base import Base
+from app.database.base import Base, UTCDateTime
 
 config = context.config
 if config.config_file_name is not None:
@@ -18,6 +18,13 @@ if not config.get_main_option("sqlalchemy.url"):
     config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 target_metadata = Base.metadata
+
+
+def render_item(type_: str, obj: object, autogen_context) -> str | bool:
+    """Render application column types as their plain SQLAlchemy equivalents."""
+    if type_ == "type" and isinstance(obj, UTCDateTime):
+        return "sa.DateTime(timezone=True)"
+    return False
 
 
 def _is_sqlite() -> bool:
@@ -32,6 +39,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         render_as_batch=_is_sqlite(),
         compare_type=True,
+        render_item=render_item,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -50,6 +58,7 @@ def run_migrations_online() -> None:
             # SQLite cannot ALTER most constraints in place; batch mode rebuilds tables.
             render_as_batch=_is_sqlite(),
             compare_type=True,
+            render_item=render_item,
         )
         with context.begin_transaction():
             context.run_migrations()
