@@ -42,6 +42,20 @@ class Settings(BaseSettings):
 
     storage_dir: Path = REPO_DIR / "storage"
 
+    # API key encryption: comma-separated "key_id:base64(32 bytes)" entries.
+    # The first entry encrypts new keys; the others still decrypt older ones (rotation).
+    encryption_keys: str = ""
+
+    # Background jobs. Redis in production; the SQLAlchemy broker needs no extra service.
+    celery_broker_url: str = f"sqla+sqlite:///{(BACKEND_DIR / 'celery-broker.db').as_posix()}"
+    celery_task_always_eager: bool = False
+
+    # AI providers
+    ai_request_timeout_seconds: float = Field(default=120.0, ge=5, le=600)
+    # OpenAI-compatible endpoints at a custom URL (e.g. a local model server).
+    # Off by default: a user-supplied URL makes the server send requests to it.
+    allow_custom_ai_endpoints: bool = False
+
     # Simple per-process limiter for credential endpoints.
     auth_rate_limit_attempts: int = 10
     auth_rate_limit_window_seconds: int = 300

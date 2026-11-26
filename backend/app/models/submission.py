@@ -47,7 +47,10 @@ class Submission(UUIDPrimaryKey, Timestamps, Base):
     # Only the latest attempt is graded; earlier attempts are kept for the record.
     is_latest: Mapped[bool] = mapped_column(Boolean, default=True)
     status: Mapped[str] = mapped_column(String(30), default=SubmissionStatus.UPLOADED.value)
+    # Shown to the student and the teacher; always safe for students to read.
     status_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Technical detail of the last processing failure, for the teacher only.
+    processing_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     file_count: Mapped[int] = mapped_column(Integer)
     page_count: Mapped[int] = mapped_column(Integer)
     total_size_bytes: Mapped[int] = mapped_column(Integer)

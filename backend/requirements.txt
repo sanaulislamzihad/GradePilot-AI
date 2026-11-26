@@ -21,3 +21,15 @@ python-multipart>=0.0.9
 PyMuPDF>=1.24
 python-docx>=1.1
 Pillow>=10.4
+
+# AI providers and key encryption
+anthropic>=1.0
+httpx>=0.27
+cryptography>=43
+
+# Background jobs (Redis broker in production; SQLAlchemy broker for local development)
+celery[redis]>=5.4
+
+# Image preprocessing for OCR
+opencv-python-headless>=4.10
+numpy>=1.26

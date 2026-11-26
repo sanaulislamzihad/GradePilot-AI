@@ -1,7 +1,18 @@
 """Import every model here so Alembic autogenerate and `Base.metadata` see them."""
 
+from app.models.ai import AIProvider, KeyStatus, ModelConfig, ModelSlot, UsageLog, UserApiKey
 from app.models.audit_log import AuditLog
 from app.models.course import Course, CourseSection, SectionEnrollment
+from app.models.evaluation import (
+    AnswerStatus,
+    Evaluation,
+    EvaluationCriterion,
+    EvaluationEvidence,
+    EvaluationQuestion,
+    EvaluationStatus,
+    ExtractedAnswer,
+    ExtractionSource,
+)
 from app.models.exam import (
     AnswerSource,
     DocumentKind,
@@ -20,6 +31,20 @@ from app.models.submission import Submission, SubmissionFile, SubmissionStatus
 from app.models.user import RefreshToken, User, UserRole
 
 __all__ = [
+    "AIProvider",
+    "AnswerStatus",
+    "Evaluation",
+    "EvaluationCriterion",
+    "EvaluationEvidence",
+    "EvaluationQuestion",
+    "EvaluationStatus",
+    "ExtractedAnswer",
+    "ExtractionSource",
+    "KeyStatus",
+    "ModelConfig",
+    "ModelSlot",
+    "UsageLog",
+    "UserApiKey",
     "AnswerSource",
     "DocumentKind",
     "Exam",
