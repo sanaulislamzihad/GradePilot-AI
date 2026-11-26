@@ -7,13 +7,16 @@ GradePilot AI helps teachers mark examination scripts against a rubric they appr
 The AI suggests marks with evidence for every criterion; teachers review, adjust and
 publish the final result. AI marks are never treated as final on their own.
 
-The project is built in phases. **Phases 1 and 2 are complete**:
+The project is built in phases. **Phases 1 to 3 are complete**:
 
 - **Phase 1 — Foundation:** authentication, role-based access control, course and section
   management, and dashboards for teachers, students and administrators.
 - **Phase 2 — Exam management:** exam creation, question paper upload and text extraction,
   editable questions and sub-questions, mark allocation, model answers, marking rubrics,
   and publishing with a shareable link and QR code.
+- **Phase 3 — Student submission:** exam access by link or dashboard, answer script upload
+  (one PDF or page images), attempt limits, duplicate protection, submission records and
+  teacher submission views.
 
 See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md) for the status of every phase.
 
@@ -179,6 +182,26 @@ The test suites need no external services and no API keys.
 7. **Publish** — allowed only when every readiness check passes. Publishing creates an
    unguessable link and a QR code.
 
+## Submission workflow (Phase 3)
+
+- Students reach an exam through its link or QR code (they are asked to sign in and are
+  brought back to the exam afterwards), or from **Available Exams**, which lists published
+  exams for the sections they have joined.
+- Exams linked to a course or section accept scripts only from students enrolled there.
+  Exams without a course accept any signed-in student who has the link.
+- A script is one PDF (any number of pages up to 100) or one image per page. The server
+  checks the exam's allowed formats and size limit, the file's real type, damaged or
+  password-protected PDFs, the deadline and the attempt limit.
+- Each submission gets an ID such as `GP-K7PM2QXR`. A replacement is a new attempt, allowed
+  only while attempts remain and the deadline has not passed; earlier attempts are kept.
+- Repeating the same upload (double click, retry after a dropped connection) cannot create
+  a second attempt: the client sends an `Idempotency-Key`, and identical files are refused.
+- Teachers see each student's current script, can filter by exam and status, search by
+  name, student ID or submission ID, and view or download the files. Once an exam has
+  submissions it can no longer be unpublished.
+- New submissions are stored with status **Received**. Text extraction and evaluation
+  (Phase 4) will move them through the rest of the lifecycle.
+
 ## API overview
 
 | Area | Endpoints |
@@ -194,6 +217,8 @@ The test suites need no external services and no API keys.
 | Exam documents | `POST /api/exams/{id}/upload-question-paper` · `POST /api/exams/{id}/extract-questions` · `POST /api/exams/{id}/model-answer` · `GET/DELETE /api/exams/{id}/documents/{document_id}` |
 | Questions | `POST /api/exams/{id}/questions` · `PATCH/DELETE /api/questions/{id}` · `POST /api/exams/{id}/questions/reorder` · `PUT /api/exams/{id}/marks` |
 | Answers and rubrics | `PUT/DELETE /api/questions/{id}/model-answer` · `PUT/DELETE /api/questions/{id}/rubric` |
+| Submissions | `POST /api/exams/{id}/submissions` · `GET /api/submissions` · `GET /api/submissions/{id}` · `GET /api/submissions/{id}/files/{file_id}` |
+| Student exams | `GET /api/student/exams` · `GET /api/student/exams/{slug}` |
 | Public | `GET /api/public/exams/{slug}` |
 | Health | `GET /api/health` |
 

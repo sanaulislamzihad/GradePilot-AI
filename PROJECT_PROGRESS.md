@@ -8,7 +8,7 @@ A feature is marked done only when it is implemented, tested and working end to 
 |-------|-------|--------|
 | 1 | Foundation: setup, database, authentication, roles, dashboards | ✅ Done |
 | 2 | Exam management: creation, question paper, questions, marks, answers, rubrics, publishing | ✅ Done |
-| 3 | Student submission | ⬜ |
+| 3 | Student submission: exam access, script upload, attempts, submission records | ✅ Done |
 | 4 | AI integration | ⬜ |
 | 5 | Advanced evaluation | ⬜ |
 | 6 | Results and analytics | ⬜ |
@@ -126,14 +126,57 @@ A feature is marked done only when it is implemented, tested and working end to 
 ### Deferred to later phases (by design)
 - AI extraction for scanned papers and handwriting, AI-drafted model answers and AI-suggested
   rubrics need the AI provider integration (Phase 4). No placeholder buttons are shown for them.
-- Students listing available exams in their dashboard and uploading scripts from the exam
-  link arrive with Phase 3. The public page currently states that online upload is not yet available.
-- Unpublishing will be blocked once an exam has submissions (Phase 3).
+- Student exam listing and script upload were delivered in Phase 3.
 
-## Phase 3 — Student submission ⬜
-- ⬜ Exam access by link or dashboard; available exams for enrolled sections
-- ⬜ Script upload with backend validation (type, MIME, size, deadline, attempts)
-- ⬜ Submission records, IDs and status tracking
+## Phase 3 — Student submission ✅
+
+### Database
+- ✅ `submissions` (reference code, attempt number, latest flag, status, student ID snapshot,
+  idempotency key) and `submission_files`; unique attempt per exam and student
+- ✅ Status field covers the full lifecycle (uploaded → … → published / failed)
+
+### Access
+- ✅ Shared link and QR code lead to the student exam page; signing in or registering returns
+  the student to the exam
+- ✅ Available Exams lists published exams for the student's sections
+- ✅ Course- and section-linked exams accept only enrolled students; link-only exams accept any student
+- ✅ Exam page shows title, course, section, teacher, total marks, deadline, instructions,
+  accepted files, attempts and submission status, with a clear reason when submitting is not possible
+
+### Upload
+- ✅ One PDF (up to 100 pages) or ordered page images (up to 30), reorderable before upload
+- ✅ Backend validation: exam formats, real file type, image decoding, per-file size limit,
+  total size, damaged or password-protected PDFs, deadline, attempt limit, enrollment
+- ✅ Upload progress, confirmation dialog and a receipt with submission ID, time and status
+- ✅ Duplicate protection: idempotency key reused on retry, identical files refused,
+  concurrent duplicates resolved by database constraints, stored files cleaned up on failure
+- ✅ Replacement attempts only while the policy allows; earlier attempts kept and marked replaced
+
+### Records and views
+- ✅ Student: My Submissions (with replaced attempts) and submission detail with in-app file preview
+- ✅ Teacher: Submissions list filtered by exam and status, search by name, student ID or
+  submission ID; detail with student details and file preview / download
+- ✅ Submission counts on exam list, publish step and dashboards; student dashboard shows
+  available, submitted and upcoming exams
+- ✅ Exams with submissions cannot be unpublished
+- ✅ Every submission recorded in the audit log
+
+### Fixed along the way
+- ✅ Signing in from a protected page now returns to that page (the guest-only route guard
+  previously sent every user to their dashboard)
+
+### Tests
+- ✅ Backend: 113 tests in total — 21 new for submissions (happy path, images, multi-page PDF,
+  attempts, idempotency, invalid and encrypted files, size and format policy, deadline,
+  enrollment, drafts, roles, privacy, search, unpublish lock, dashboards)
+- ✅ Frontend: 30 tests in total — script picker rules, blocked reasons, upload retry with the
+  same idempotency key, receipt, return after sign-in
+- ✅ Full flow in a real browser (Edge): shared link → sign in → upload PDF → receipt →
+  dashboard → submission preview → teacher submissions list and detail
+
+### Deferred to later phases (by design)
+- Background job queue (Redis + worker) and processing of submissions start with Phase 4,
+  when there is extraction work to queue. New submissions stay **Received** until then.
 
 ## Phase 4 — AI integration ⬜
 - ⬜ Provider adapters and central AI router
