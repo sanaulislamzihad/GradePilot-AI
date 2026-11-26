@@ -11,14 +11,18 @@ interface DialogProps {
   description?: ReactNode
   children?: ReactNode
   footer?: ReactNode
+  /** Wide layout for previews. */
+  wide?: boolean
 }
 
-export function Dialog({ open, onOpenChange, title, description, children, footer }: DialogProps) {
+export function Dialog({ open, onOpenChange, title, description, children, footer, wide }: DialogProps) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 z-50 bg-zinc-950/40" />
-        <RadixDialog.Content className="fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-zinc-200 bg-white shadow-lg focus:outline-none">
+        <RadixDialog.Content
+          className={`fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-zinc-200 bg-white shadow-lg focus:outline-none ${wide ? 'max-w-4xl' : 'max-w-md'}`}
+        >
           <div className="flex items-start justify-between gap-4 px-5 pt-5">
             <div>
               <RadixDialog.Title className="text-base font-semibold text-zinc-900">{title}</RadixDialog.Title>

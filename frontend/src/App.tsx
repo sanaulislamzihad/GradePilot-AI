@@ -5,6 +5,7 @@ import { AppLayout } from '@/layouts/AppLayout'
 import { GuestOnly, RequireRole } from '@/layouts/RouteGuards'
 import LandingPage from '@/pages/LandingPage'
 import NotFoundPage from '@/pages/NotFoundPage'
+import PublicExamPage from '@/pages/PublicExamPage'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
 
@@ -13,8 +14,16 @@ const ProfilePage = lazy(() => import('@/pages/shared/ProfilePage'))
 const TeacherDashboard = lazy(() => import('@/pages/teacher/TeacherDashboard'))
 const CoursesPage = lazy(() => import('@/pages/teacher/CoursesPage'))
 const CourseDetailPage = lazy(() => import('@/pages/teacher/CourseDetailPage'))
+const ExamsPage = lazy(() => import('@/pages/teacher/exams/ExamsPage'))
+const CreateExamPage = lazy(() => import('@/pages/teacher/exams/CreateExamPage'))
+const ExamWorkspacePage = lazy(() => import('@/pages/teacher/exams/ExamWorkspacePage'))
 const StudentDashboard = lazy(() => import('@/pages/student/StudentDashboard'))
 const StudentCoursesPage = lazy(() => import('@/pages/student/StudentCoursesPage'))
+const AvailableExamsPage = lazy(() => import('@/pages/student/AvailableExamsPage'))
+const StudentExamPage = lazy(() => import('@/pages/student/StudentExamPage'))
+const MySubmissionsPage = lazy(() => import('@/pages/student/MySubmissionsPage'))
+const SubmissionDetailPage = lazy(() => import('@/pages/shared/SubmissionDetailPage'))
+const SubmissionsPage = lazy(() => import('@/pages/teacher/SubmissionsPage'))
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'))
 const UsersPage = lazy(() => import('@/pages/admin/UsersPage'))
 const AuditLogPage = lazy(() => import('@/pages/admin/AuditLogPage'))
@@ -25,6 +34,7 @@ export default function App() {
     <Suspense fallback={<LoadingState className="min-h-screen" />}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/exam/:slug" element={<PublicExamPage />} />
 
         <Route element={<GuestOnly />}>
           <Route path="/login" element={<LoginPage />} />
@@ -36,6 +46,11 @@ export default function App() {
             <Route index element={<TeacherDashboard />} />
             <Route path="courses" element={<CoursesPage />} />
             <Route path="courses/:courseId" element={<CourseDetailPage />} />
+            <Route path="exams" element={<ExamsPage />} />
+            <Route path="exams/new" element={<CreateExamPage />} />
+            <Route path="exams/:examId/:step?" element={<ExamWorkspacePage />} />
+            <Route path="submissions" element={<SubmissionsPage />} />
+            <Route path="submissions/:submissionId" element={<SubmissionDetailPage />} />
             <Route path="profile" element={<ProfilePage />} />
           </Route>
         </Route>
@@ -44,6 +59,10 @@ export default function App() {
           <Route path="/student" element={<AppLayout />}>
             <Route index element={<StudentDashboard />} />
             <Route path="courses" element={<StudentCoursesPage />} />
+            <Route path="exams" element={<AvailableExamsPage />} />
+            <Route path="exams/:slug" element={<StudentExamPage />} />
+            <Route path="submissions" element={<MySubmissionsPage />} />
+            <Route path="submissions/:submissionId" element={<SubmissionDetailPage />} />
             <Route path="profile" element={<ProfilePage />} />
           </Route>
         </Route>

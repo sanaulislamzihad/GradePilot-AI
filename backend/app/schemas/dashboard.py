@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.models.user import UserRole
 from app.schemas.course import StudentEnrollment
+from app.schemas.submission import StudentExamItem
 
 
 class ActivityItem(BaseModel):
@@ -22,17 +23,33 @@ class TeacherCourseSummary(BaseModel):
     student_count: int
 
 
+class TeacherExamSummary(BaseModel):
+    id: uuid.UUID
+    title: str
+    status: str
+    course_code: str | None
+    submission_deadline: datetime | None
+
+
 class TeacherDashboard(BaseModel):
     course_count: int
     section_count: int
     student_count: int
+    exam_count: int
+    published_exam_count: int
+    draft_exam_count: int
+    submission_count: int
     courses: list[TeacherCourseSummary]
+    recent_exams: list[TeacherExamSummary]
     recent_activity: list[ActivityItem]
 
 
 class StudentDashboard(BaseModel):
     enrollment_count: int
     course_count: int
+    available_exam_count: int
+    submitted_exam_count: int
+    upcoming_exams: list[StudentExamItem]
     enrollments: list[StudentEnrollment]
     recent_activity: list[ActivityItem]
 

@@ -30,6 +30,15 @@ _SUMMARIES: dict[str, str] = {
     "section.regenerate_code": "Generated a new join code for {code} section {section}",
     "section.remove_student": "Removed {student} from {code} section {section}",
     "enrollment.join": "Joined {code} section {section}",
+    "exam.create": "Created exam {title}",
+    "exam.update": "Updated exam {title}",
+    "exam.delete": "Deleted exam {title}",
+    "exam.question_paper_upload": "Uploaded the question paper for {title}",
+    "exam.questions_extract": "Extracted {questions} questions for {title}",
+    "exam.model_answer_upload": "Uploaded model answers for {title}",
+    "exam.publish": "Published exam {title}",
+    "exam.unpublish": "Unpublished exam {title}",
+    "submission.create": "Submitted attempt {attempt} for {title} ({code})",
     "enrollment.leave": "Left {code} section {section}",
 }
 

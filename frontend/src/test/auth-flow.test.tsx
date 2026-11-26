@@ -18,13 +18,32 @@ vi.mock('@/services/api', () => ({
   authApi: { login: vi.fn(), register: vi.fn(), logout: vi.fn(), me: vi.fn() },
   dashboardApi: { teacher: vi.fn(), student: vi.fn() },
   courseApi: {},
-  studentApi: {},
+  studentApi: { enrollments: vi.fn().mockResolvedValue([]) },
   adminApi: {},
   profileApi: {},
 }))
 
-const teacherDashboard = { course_count: 2, section_count: 3, student_count: 41, courses: [], recent_activity: [] }
-const studentDashboard = { enrollment_count: 0, course_count: 0, enrollments: [], recent_activity: [] }
+const teacherDashboard = {
+  course_count: 2,
+  section_count: 3,
+  student_count: 41,
+  exam_count: 0,
+  published_exam_count: 0,
+  draft_exam_count: 0,
+  submission_count: 0,
+  courses: [],
+  recent_exams: [],
+  recent_activity: [],
+}
+const studentDashboard = {
+  enrollment_count: 0,
+  course_count: 0,
+  available_exam_count: 0,
+  submitted_exam_count: 0,
+  upcoming_exams: [],
+  enrollments: [],
+  recent_activity: [],
+}
 
 function renderApp(path: string, session: TokenResponse | null) {
   vi.mocked(refreshSession).mockImplementation(() =>
@@ -70,7 +89,7 @@ describe('teacher dashboard', () => {
 
     const nav = screen.getAllByRole('navigation', { name: 'Main' })[0]!
     const links = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)
-    expect(links).toEqual(['Dashboard', 'Courses', 'Profile'])
+    expect(links).toEqual(['Dashboard', 'My Exams', 'Create Exam', 'Submissions', 'Courses', 'Profile'])
   })
 })
 
@@ -142,5 +161,17 @@ describe('registration', () => {
     await user.type(screen.getByLabelText('Confirm password'), 'Different1')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
     expect(await screen.findByText('Passwords do not match')).toBeInTheDocument()
+  })
+})
+
+describe('return after sign-in', () => {
+  it('opens the page that required sign-in once the student signs in', async () => {
+    const user = userEvent.setup()
+    vi.mocked(authApi.login).mockResolvedValue(makeSession('student'))
+    renderApp('/student/courses', null)
+    await user.type(await screen.findByLabelText('Email'), 'student@example.edu')
+    await user.type(screen.getByLabelText('Password'), 'Passw0rd!')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByRole('heading', { name: 'My Courses' })).toBeInTheDocument()
   })
 })

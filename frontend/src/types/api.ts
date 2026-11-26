@@ -85,13 +85,21 @@ export interface TeacherDashboard {
   course_count: number
   section_count: number
   student_count: number
+  exam_count: number
+  published_exam_count: number
+  draft_exam_count: number
+  submission_count: number
   courses: { id: string; code: string; name: string; section_count: number; student_count: number }[]
+  recent_exams: { id: string; title: string; status: ExamStatus; course_code: string | null; submission_deadline: string | null }[]
   recent_activity: ActivityItem[]
 }
 
 export interface StudentDashboard {
   enrollment_count: number
   course_count: number
+  available_exam_count: number
+  submitted_exam_count: number
+  upcoming_exams: StudentExamItem[]
   enrollments: StudentEnrollment[]
   recent_activity: ActivityItem[]
 }
@@ -133,4 +141,214 @@ export interface SystemStatus {
 export interface ApiErrorBody {
   detail: string
   fields?: { field: string | null; message: string }[]
+}
+
+// --- Exams (Phase 2) -------------------------------------------------------
+
+export type ExamType = 'quiz' | 'assignment' | 'midterm' | 'final'
+export type ExamStatus = 'draft' | 'published'
+export type QuestionType = 'short' | 'descriptive' | 'mathematical' | 'multiple_choice'
+export type ExtractionStatus = 'succeeded' | 'needs_ocr' | 'failed'
+
+export interface ExamSummary {
+  id: string
+  title: string
+  exam_type: ExamType
+  status: ExamStatus
+  course_id: string | null
+  course_code: string | null
+  course_name: string | null
+  section_id: string | null
+  section_name: string | null
+  total_marks: number
+  exam_date: string | null
+  submission_deadline: string | null
+  question_count: number
+  submission_count: number
+  created_at: string
+  updated_at: string
+  published_at: string | null
+}
+
+export interface ModelAnswer {
+  content: string
+  source: 'manual' | 'uploaded'
+  is_approved: boolean
+  approved_at: string | null
+  updated_at: string
+}
+
+export interface RubricCriterion {
+  id: string
+  name: string
+  description: string | null
+  max_marks: number
+}
+
+export interface Rubric {
+  is_approved: boolean
+  approved_at: string | null
+  total: number
+  criteria: RubricCriterion[]
+}
+
+export interface Question {
+  id: string
+  parent_id: string | null
+  label: string
+  full_label: string
+  position: number
+  text: string
+  question_type: QuestionType
+  marks: number | null
+  is_leaf: boolean
+  model_answer: ModelAnswer | null
+  rubric: Rubric | null
+  children: Question[]
+}
+
+export interface ExamDocument {
+  id: string
+  kind: 'question_paper' | 'model_answer'
+  original_filename: string
+  content_type: string
+  size_bytes: number
+  page_count: number | null
+  extraction_status: ExtractionStatus
+  extraction_message: string | null
+  extracted_text: string | null
+  created_at: string
+}
+
+export interface ReadinessCheck {
+  key: 'details' | 'questions' | 'marks' | 'model_answers' | 'rubrics'
+  label: string
+  ok: boolean
+  detail: string
+}
+
+export interface ExamDetail extends ExamSummary {
+  instructions: string | null
+  allowed_formats: string[]
+  max_file_size_mb: number
+  max_attempts: number
+  public_slug: string | null
+  questions: Question[]
+  documents: ExamDocument[]
+  readiness: {
+    ready: boolean
+    allocated_marks: number
+    total_marks: number
+    checks: ReadinessCheck[]
+  }
+}
+
+export interface ModelAnswerUploadResult {
+  document: ExamDocument
+  matched: string[]
+  skipped_approved: string[]
+  unmatched_questions: string[]
+  unused_sections: string[]
+  exam: ExamDetail
+}
+
+export interface PublicExam {
+  title: string
+  exam_type: ExamType
+  course_code: string | null
+  course_name: string | null
+  section_name: string | null
+  teacher_name: string
+  total_marks: number
+  exam_date: string | null
+  submission_deadline: string | null
+  instructions: string | null
+  allowed_formats: string[]
+  max_file_size_mb: number
+  max_attempts: number
+  question_count: number
+  is_open: boolean
+}
+
+// --- Submissions (Phase 3) -------------------------------------------------
+
+export type SubmissionStatus =
+  | 'uploaded'
+  | 'queued'
+  | 'extracting'
+  | 'ocr_review_required'
+  | 'ready_for_evaluation'
+  | 'evaluating'
+  | 'verifying'
+  | 'teacher_review_required'
+  | 'approved'
+  | 'published'
+  | 'failed'
+
+export interface SubmissionFile {
+  id: string
+  position: number
+  original_filename: string
+  content_type: string
+  size_bytes: number
+  page_count: number
+}
+
+export interface SubmissionSummary {
+  id: string
+  code: string
+  exam_id: string
+  exam_title: string
+  course_code: string | null
+  section_name: string | null
+  student: { id: string; full_name: string; email: string; student_number: string }
+  attempt_number: number
+  is_latest: boolean
+  status: SubmissionStatus
+  status_message: string | null
+  file_count: number
+  page_count: number
+  total_size_bytes: number
+  submitted_at: string
+}
+
+export interface SubmissionDetail extends SubmissionSummary {
+  max_attempts: number
+  submission_deadline: string | null
+  files: SubmissionFile[]
+}
+
+export interface StudentExamItem {
+  id: string
+  slug: string
+  title: string
+  exam_type: ExamType
+  course_code: string | null
+  course_name: string | null
+  section_name: string | null
+  teacher_name: string
+  total_marks: number
+  submission_deadline: string | null
+  is_open: boolean
+  max_attempts: number
+  attempts_used: number
+  latest_submission: {
+    id: string
+    code: string
+    status: SubmissionStatus
+    attempt_number: number
+    submitted_at: string
+  } | null
+}
+
+export interface StudentExamDetail extends StudentExamItem {
+  exam_date: string | null
+  instructions: string | null
+  allowed_formats: string[]
+  max_file_size_mb: number
+  question_count: number
+  can_submit: boolean
+  blocked_reason: string | null
+  attempts_left: number
+  submissions: SubmissionSummary[]
 }

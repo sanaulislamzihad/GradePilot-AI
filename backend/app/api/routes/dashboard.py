@@ -8,10 +8,19 @@ from app.api.deps import DbSession, StudentUser, TeacherUser
 from app.api.routes.student import list_student_enrollments
 from app.models.audit_log import AuditLog
 from app.models.course import Course, CourseSection, SectionEnrollment
+from app.models.exam import Exam, ExamStatus
+from app.models.submission import Submission
 from app.models.user import User
-from app.schemas.dashboard import ActivityItem, StudentDashboard, TeacherCourseSummary, TeacherDashboard
+from app.schemas.dashboard import (
+    ActivityItem,
+    StudentDashboard,
+    TeacherCourseSummary,
+    TeacherDashboard,
+    TeacherExamSummary,
+)
 from app.services import audit
 from app.services.course_service import course_counts
+from app.services.submission_service import available_exams
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -47,10 +56,35 @@ def teacher_dashboard(teacher: TeacherUser, db: DbSession) -> TeacherDashboard:
         .where(Course.teacher_id == teacher.id)
     ) or 0
 
+    exam_status_counts = dict(
+        db.execute(
+            select(Exam.status, func.count(Exam.id)).where(Exam.teacher_id == teacher.id).group_by(Exam.status)
+        ).all()
+    )
+    recent_exams = db.scalars(
+        select(Exam).where(Exam.teacher_id == teacher.id).order_by(Exam.updated_at.desc()).limit(5)
+    ).all()
+
     return TeacherDashboard(
         course_count=len(courses),
         section_count=section_count,
         student_count=student_count,
+        exam_count=sum(exam_status_counts.values()),
+        published_exam_count=exam_status_counts.get(ExamStatus.PUBLISHED.value, 0),
+        draft_exam_count=exam_status_counts.get(ExamStatus.DRAFT.value, 0),
+        submission_count=db.scalar(
+            select(func.count(Submission.id))
+            .join(Exam, Submission.exam_id == Exam.id)
+            .where(Exam.teacher_id == teacher.id, Submission.is_latest.is_(True))
+        ) or 0,
+        recent_exams=[
+            TeacherExamSummary(
+                id=e.id, title=e.title, status=e.status,
+                course_code=e.course.code if e.course else None,
+                submission_deadline=e.submission_deadline,
+            )
+            for e in recent_exams
+        ],
         courses=[
             TeacherCourseSummary(
                 id=c.id,
@@ -68,9 +102,14 @@ def teacher_dashboard(teacher: TeacherUser, db: DbSession) -> TeacherDashboard:
 @router.get("/student", response_model=StudentDashboard)
 def student_dashboard(student: StudentUser, db: DbSession) -> StudentDashboard:
     enrollments = list_student_enrollments(db, student)
+    exams = available_exams(db, student)
     return StudentDashboard(
         enrollment_count=len(enrollments),
         course_count=len({e.course_id for e in enrollments}),
+        available_exam_count=len(exams),
+        submitted_exam_count=sum(1 for e in exams if e.latest_submission is not None),
+        # Open exams still waiting for a script, soonest deadline first.
+        upcoming_exams=[e for e in exams if e.is_open and e.latest_submission is None][:5],
         enrollments=enrollments,
         recent_activity=recent_activity(db, student),
     )
