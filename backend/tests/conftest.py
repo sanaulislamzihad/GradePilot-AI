@@ -17,6 +17,10 @@ os.environ.update(
         "JWT_SECRET_KEY": "test-secret-key-that-is-long-enough-for-hs256-signing",
         "STORAGE_DIR": str(_TMP / "storage"),
         "AUTH_RATE_LIMIT_ATTEMPTS": "10",
+        # Fixed test-only key (base64 of 32 bytes); never used outside the test suite.
+        "ENCRYPTION_KEYS": "test:" + "A" * 43 + "=",
+        "CELERY_TASK_ALWAYS_EAGER": "true",
+        "ALLOW_CUSTOM_AI_ENDPOINTS": "false",
     }
 )
 
@@ -34,6 +38,7 @@ from app.security.passwords import hash_password  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 PASSWORD = "Passw0rd!"
+SEEDED_TABLES = {"ai_providers"}
 
 
 def alembic_config(database_url: str) -> Config:
@@ -55,7 +60,9 @@ def _clean_state() -> Iterator[None]:
     yield
     with engine.begin() as conn:
         for table in reversed(Base.metadata.sorted_tables):
-            conn.execute(table.delete())
+            # Reference data seeded by migrations stays in place.
+            if table.name not in SEEDED_TABLES:
+                conn.execute(table.delete())
     auth_limiter.reset()
 
 
