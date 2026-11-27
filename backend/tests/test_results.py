@@ -212,3 +212,25 @@ def test_analytics_with_no_approved_results(client, teacher, ai):
     stats = client.get(f"/api/exams/{exam['id']}/analytics", headers=auth(teacher)).json()
     assert stats["graded_count"] == 0 and stats["average"] is None and stats["common_missing_concepts"] == []
     assert sum(b["count"] for b in stats["distribution"]) == 0
+
+
+def test_pdf_text_keeps_accents_and_punctuation():
+    """The embedded, subset font keeps a Unicode mapping, so the PDF text is searchable and copyable."""
+    import uuid
+
+    import pymupdf
+
+    from app.schemas.results import ResultView
+    from app.services import reports
+
+    view = ResultView(
+        submission_id=uuid.uuid4(), submission_code="GP-1", exam_id=uuid.uuid4(), exam_title="Midterm — Part A",
+        course_code="CSE445", section_name="1", student_name="Zoë Ñúñez", student_number="2021-0001",
+        provisional=False, total=5, max_marks=10, percentage=50, published_at=None,
+        teacher_comment="Good · clear", questions=[],
+    )
+    data = reports.result_pdf(view)
+    text = pymupdf.open(stream=data, filetype="pdf")[0].get_text()
+    assert "Midterm — Part A" in text and "Zoë Ñúñez" in text and "Good · clear" in text
+    assert "�" not in text
+    assert len(data) < 200_000  # fonts are subset, not embedded whole
