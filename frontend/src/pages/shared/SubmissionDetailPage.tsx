@@ -1,7 +1,8 @@
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Award } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { SubmissionFiles } from '@/components/SubmissionFiles'
 import { SubmissionStatusBadge } from '@/components/SubmissionStatusBadge'
+import { buttonVariants } from '@/components/ui/Button'
 import { Card, CardHeader } from '@/components/ui/Card'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { ErrorState, LoadingState } from '@/components/ui/States'
@@ -12,10 +13,12 @@ import { usePolling } from '@/hooks/usePolling'
 import { ExtractionEditor } from '@/pages/teacher/submission/ExtractionEditor'
 import { ProcessingPanel } from '@/pages/teacher/submission/ProcessingPanel'
 import { ReviewPanel } from '@/pages/teacher/submission/ReviewPanel'
-import { processingApi, submissionApi } from '@/services/api'
+import { processingApi, resultsApi, submissionApi } from '@/services/api'
 import type { SubmissionDetail } from '@/types/api'
 import { formatBytes, formatDateTime } from '@/utils/format'
 import { IN_PROGRESS_STATUSES } from '@/utils/submissionStatus'
+
+const MAY_HAVE_RESULT = ['teacher_review_required', 'approved', 'published']
 
 const AFTER_EXTRACTION = ['ocr_review_required', 'ready_for_evaluation', 'evaluating', 'teacher_review_required', 'failed', 'approved', 'published']
 
@@ -68,6 +71,12 @@ export default function SubmissionDetailPage() {
     `submission:${submissionId}`,
   )
   usePolling(Boolean(submission && IN_PROGRESS_STATUSES.includes(submission.status)), reload)
+  // Students: a result exists once it is published, or earlier if the exam shows provisional marks.
+  const checkResult = Boolean(!isTeacher && submission?.is_latest && MAY_HAVE_RESULT.includes(submission.status))
+  const result = useAsync(
+    () => (checkResult ? resultsApi.get(submissionId).catch(() => null) : Promise.resolve(null)),
+    `submission-result:${submissionId}:${checkResult ? submission?.status : ''}`,
+  )
 
   if (loading && (!submission || submission.id !== submissionId)) return <LoadingState />
   if (error || !submission) return <ErrorState message={error ?? 'Submission not found'} onRetry={reload} />
@@ -100,6 +109,13 @@ export default function SubmissionDetailPage() {
             <SubmissionStatusBadge status={submission.status} />
             <span>{submission.exam_title}</span>
           </span>
+        }
+        actions={
+          result.data && (
+            <Link to={`/student/results/${submission.id}`} className={buttonVariants()}>
+              <Award /> {result.data.provisional ? 'View provisional result' : 'View result'}
+            </Link>
+          )
         }
       />
 

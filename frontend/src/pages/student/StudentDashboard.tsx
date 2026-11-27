@@ -8,12 +8,14 @@ import { StatCard } from '@/components/ui/StatCard'
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/States'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
-import { dashboardApi } from '@/services/api'
+import { ResultList } from '@/pages/student/results/MyResultsPage'
+import { dashboardApi, resultsApi } from '@/services/api'
 import { formatDateTime, formatRelative } from '@/utils/format'
 
 export default function StudentDashboard() {
   const { user } = useAuth()
   const { data, error, loading, reload } = useAsync(dashboardApi.student, 'student-dashboard')
+  const results = useAsync(resultsApi.mine, 'student-dashboard-results')
 
   return (
     <>
@@ -68,6 +70,20 @@ export default function StudentDashboard() {
               </ul>
             )}
           </Card>
+
+          {results.data && results.data.length > 0 && (
+            <Card>
+              <CardHeader
+                title="Latest results"
+                action={
+                  <Link to="/student/results" className="text-sm font-medium text-zinc-600 hover:text-zinc-900">
+                    View all
+                  </Link>
+                }
+              />
+              <ResultList items={results.data.slice(0, 3)} />
+            </Card>
+          )}
 
           <div className="grid gap-6 lg:grid-cols-5">
             <Card className="lg:col-span-3">
