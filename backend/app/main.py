@@ -17,6 +17,7 @@ from app.api.routes import (
     exams,
     health,
     public,
+    results,
     student,
     submissions,
     users,
@@ -56,7 +57,7 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
 
-    for module in (health, auth, users, courses, exams, submissions, evaluations, ai_settings, ai_assist, public, student, dashboard, admin):
+    for module in (health, auth, users, courses, exams, submissions, evaluations, results, ai_settings, ai_assist, public, student, dashboard, admin):
         app.include_router(module.router, prefix=settings.api_prefix)
 
     return app
