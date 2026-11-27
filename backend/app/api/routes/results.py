@@ -178,17 +178,7 @@ def student_results(student: StudentUser, db: DbSession) -> list[StudentResultIt
         select(Submission).where(Submission.student_id == student.id, Submission.is_latest.is_(True))
         .options(*_LOAD).order_by(Submission.submitted_at.desc())
     ).all()
-    items = []
-    for submission in submissions:
-        view = svc.result_view(db, submission, for_student=True)
-        if view is None:
-            continue
-        items.append(StudentResultItem(
-            submission_id=submission.id, exam_id=view.exam_id, exam_title=view.exam_title, course_code=view.course_code,
-            provisional=view.provisional, total=view.total, max_marks=view.max_marks, percentage=view.percentage,
-            published_at=view.published_at,
-        ))
-    return items
+    return svc.student_result_items(db, list(submissions))
 
 
 # --- Analytics and exports -------------------------------------------------

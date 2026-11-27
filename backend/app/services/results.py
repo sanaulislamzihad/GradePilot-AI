@@ -17,7 +17,7 @@ from app.models.evaluation import Evaluation, EvaluationQuestion, FinalResult, R
 from app.models.exam import Exam, ResultReleaseMode
 from app.models.submission import Submission, SubmissionStatus as S
 from app.models.user import User
-from app.schemas.results import ResultCriterion, ResultQuestion, ResultView
+from app.schemas.results import ResultCriterion, ResultQuestion, ResultView, StudentResultItem
 from app.services import review
 from app.services.exam_service import leaves
 
@@ -160,3 +160,40 @@ def result_view(db: Session, submission: Submission, *, for_student: bool) -> Re
     return _view(submission, snapshot, provisional=True, total=evaluation.final_total, maximum=evaluation.total_max)
 
 
+
+
+def student_result_items(db: Session, submissions: list[Submission]) -> list[StudentResultItem]:
+    """Summaries for a student's result list, loaded in a fixed number of queries.
+
+    Follows the same visibility rules as `result_view` without building full views.
+    """
+    ids = [s.id for s in submissions]
+    finals = {f.submission_id: f for f in db.scalars(select(FinalResult).where(FinalResult.submission_id.in_(ids)))}
+    candidates = [
+        s.id for s in submissions
+        if s.id not in finals and s.is_latest and s.status in PROVISIONAL_STATUSES
+        and s.exam.result_release_mode == ResultReleaseMode.PROVISIONAL.value
+    ]
+    evaluations = {
+        e.submission_id: e
+        for e in db.scalars(select(Evaluation).where(
+            Evaluation.submission_id.in_(candidates), Evaluation.is_current.is_(True)))
+    } if candidates else {}
+
+    items = []
+    for submission in submissions:
+        final = finals.get(submission.id)
+        evaluation = evaluations.get(submission.id)
+        if final is not None:
+            total, maximum, published_at = final.total, final.max_marks, final.published_at
+        elif evaluation is not None and evaluation.final_total is not None:
+            total, maximum, published_at = evaluation.final_total, evaluation.total_max, None
+        else:
+            continue
+        exam = submission.exam
+        items.append(StudentResultItem(
+            submission_id=submission.id, exam_id=exam.id, exam_title=exam.title,
+            course_code=exam.course.code if exam.course else None, provisional=final is None,
+            total=total, max_marks=maximum, percentage=percentage(total, maximum), published_at=published_at,
+        ))
+    return items
