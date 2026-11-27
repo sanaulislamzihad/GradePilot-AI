@@ -39,6 +39,10 @@ class TeacherDashboard(BaseModel):
     published_exam_count: int
     draft_exam_count: int
     submission_count: int
+    evaluated_count: int  # marked by AI: awaiting review, approved or published
+    pending_review_count: int
+    approved_count: int
+    average_percentage: float | None  # teacher-approved marks only
     courses: list[TeacherCourseSummary]
     recent_exams: list[TeacherExamSummary]
     recent_activity: list[ActivityItem]

@@ -89,6 +89,10 @@ export interface TeacherDashboard {
   published_exam_count: number
   draft_exam_count: number
   submission_count: number
+  evaluated_count: number
+  pending_review_count: number
+  approved_count: number
+  average_percentage: number | null
   courses: { id: string; code: string; name: string; section_count: number; student_count: number }[]
   recent_exams: { id: string; title: string; status: ExamStatus; course_code: string | null; submission_deadline: string | null }[]
   recent_activity: ActivityItem[]

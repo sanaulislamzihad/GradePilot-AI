@@ -1,4 +1,4 @@
-import { BookOpen, FileText, Inbox, Plus, Users } from 'lucide-react'
+import { BookOpen, CheckCheck, ClipboardCheck, FileText, Inbox, Percent, Plus, Sparkles, Users } from 'lucide-react'
 import { Link } from 'react-router'
 import { ActivityList } from '@/components/ActivityList'
 import { buttonVariants } from '@/components/ui/Button'
@@ -9,7 +9,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/States'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
 import { dashboardApi } from '@/services/api'
-import { formatDateTime } from '@/utils/format'
+import { formatDateTime, formatMarks } from '@/utils/format'
 import { ExamStatusBadge } from './exams/ExamStatusBadge'
 
 export default function TeacherDashboard() {
@@ -44,6 +44,30 @@ export default function TeacherDashboard() {
             <StatCard label="Submissions" value={data.submission_count} icon={Inbox} hint="Current script per student" />
             <StatCard label="Courses" value={data.course_count} icon={BookOpen} hint={`${data.section_count} sections`} />
             <StatCard label="Enrolled students" value={data.student_count} icon={Users} hint="Counted once across courses" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Evaluated" value={data.evaluated_count} icon={Sparkles} hint="Marked and ready for review or released" />
+            <StatCard
+              label="Pending review"
+              value={data.pending_review_count}
+              icon={ClipboardCheck}
+              hint={
+                data.pending_review_count > 0 ? (
+                  <Link to="/teacher/evaluation" className="font-medium text-zinc-700 hover:text-zinc-900 hover:underline">
+                    Review now
+                  </Link>
+                ) : (
+                  'Nothing waiting'
+                )
+              }
+            />
+            <StatCard label="Approved results" value={data.approved_count} icon={CheckCheck} hint="Approved or published" />
+            <StatCard
+              label="Average class marks"
+              value={data.average_percentage === null ? '—' : `${formatMarks(data.average_percentage)}%`}
+              icon={Percent}
+              hint="Teacher-approved marks, all exams"
+            />
           </div>
 
           <Card>

@@ -31,7 +31,11 @@ const teacherDashboard = {
   exam_count: 0,
   published_exam_count: 0,
   draft_exam_count: 0,
-  submission_count: 0,
+  submission_count: 12,
+  evaluated_count: 9,
+  pending_review_count: 3,
+  approved_count: 6,
+  average_percentage: 67.5,
   courses: [],
   recent_exams: [],
   recent_activity: [],
@@ -87,6 +91,8 @@ describe('teacher dashboard', () => {
   it('shows counts from the API and only implemented navigation', async () => {
     renderApp('/teacher', makeSession('teacher'))
     expect(await screen.findByText('41')).toBeInTheDocument()
+    expect(screen.getByText('67.5%')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Review now' })).toHaveAttribute('href', '/teacher/evaluation')
 
     const nav = screen.getAllByRole('navigation', { name: 'Main' })[0]!
     const links = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)

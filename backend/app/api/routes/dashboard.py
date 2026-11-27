@@ -9,7 +9,8 @@ from app.api.routes.student import list_student_enrollments
 from app.models.audit_log import AuditLog
 from app.models.course import Course, CourseSection, SectionEnrollment
 from app.models.exam import Exam, ExamStatus
-from app.models.submission import Submission
+from app.models.evaluation import Evaluation, ReviewStatus
+from app.models.submission import Submission, SubmissionStatus as S
 from app.models.user import User
 from app.schemas.dashboard import (
     ActivityItem,
@@ -65,6 +66,27 @@ def teacher_dashboard(teacher: TeacherUser, db: DbSession) -> TeacherDashboard:
         select(Exam).where(Exam.teacher_id == teacher.id).order_by(Exam.updated_at.desc()).limit(5)
     ).all()
 
+    submission_status_counts = dict(
+        db.execute(
+            select(Submission.status, func.count(Submission.id))
+            .join(Exam, Submission.exam_id == Exam.id)
+            .where(Exam.teacher_id == teacher.id, Submission.is_latest.is_(True))
+            .group_by(Submission.status)
+        ).all()
+    )
+    finished = (S.APPROVED.value, S.PUBLISHED.value)
+    # Average of teacher-approved marks only, as a percentage so different exams compare.
+    average = db.scalar(
+        select(func.avg(Evaluation.final_total * 100 / Evaluation.total_max))
+        .join(Submission, Evaluation.submission_id == Submission.id)
+        .join(Exam, Submission.exam_id == Exam.id)
+        .where(
+            Exam.teacher_id == teacher.id, Submission.is_latest.is_(True), Submission.status.in_(finished),
+            Evaluation.is_current.is_(True), Evaluation.review_status == ReviewStatus.APPROVED.value,
+            Evaluation.final_total.is_not(None), Evaluation.total_max > 0,
+        )
+    )
+
     return TeacherDashboard(
         course_count=len(courses),
         section_count=section_count,
@@ -72,11 +94,14 @@ def teacher_dashboard(teacher: TeacherUser, db: DbSession) -> TeacherDashboard:
         exam_count=sum(exam_status_counts.values()),
         published_exam_count=exam_status_counts.get(ExamStatus.PUBLISHED.value, 0),
         draft_exam_count=exam_status_counts.get(ExamStatus.DRAFT.value, 0),
-        submission_count=db.scalar(
-            select(func.count(Submission.id))
-            .join(Exam, Submission.exam_id == Exam.id)
-            .where(Exam.teacher_id == teacher.id, Submission.is_latest.is_(True))
-        ) or 0,
+        submission_count=sum(submission_status_counts.values()),
+        evaluated_count=sum(
+            n for status, n in submission_status_counts.items()
+            if status in (S.TEACHER_REVIEW_REQUIRED.value, *finished)
+        ),
+        pending_review_count=submission_status_counts.get(S.TEACHER_REVIEW_REQUIRED.value, 0),
+        approved_count=sum(submission_status_counts.get(status, 0) for status in finished),
+        average_percentage=round(float(average), 1) if average is not None else None,
         recent_exams=[
             TeacherExamSummary(
                 id=e.id, title=e.title, status=e.status,

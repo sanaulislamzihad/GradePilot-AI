@@ -234,3 +234,18 @@ def test_pdf_text_keeps_accents_and_punctuation():
     assert "Midterm — Part A" in text and "Zoë Ñúñez" in text and "Good · clear" in text
     assert "�" not in text
     assert len(data) < 200_000  # fonts are subset, not embedded whole
+
+
+def test_teacher_dashboard_counts_review_work_and_average(client, teacher, student, ai, make_client):
+    exam = setup(client, teacher)
+    empty = client.get("/api/dashboard/teacher", headers=auth(teacher)).json()
+    assert (empty["evaluated_count"], empty["pending_review_count"], empty["average_percentage"]) == (0, 0, None)
+
+    _, approved_eval = mark(client, teacher, student, ai, exam)        # 6 / 15 = 40%
+    approve(client, teacher, approved_eval)
+    mark(client, teacher, register(make_client(), "student"), ai, exam)  # still under review: not averaged
+
+    dashboard = client.get("/api/dashboard/teacher", headers=auth(teacher)).json()
+    assert dashboard["submission_count"] == 2 and dashboard["evaluated_count"] == 2
+    assert dashboard["pending_review_count"] == 1 and dashboard["approved_count"] == 1
+    assert dashboard["average_percentage"] == 40.0
