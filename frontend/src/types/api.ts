@@ -451,25 +451,86 @@ export interface ExtractionView {
 }
 
 export interface EvaluationCriterion {
+  id: string
   name: string
   max_marks: number
   awarded: number
+  teacher_awarded: number | null
+  final_awarded: number
   explanation: string | null
   missing_concepts: string[]
   evidence: { quote: string; found_in_answer: boolean }[]
 }
 
+export interface Verification {
+  provider: string
+  model: string
+  same_model_as_evaluator: boolean
+  verdict: 'agrees' | 'disagrees' | 'failed'
+  suggested_awarded: number | null
+  rubric_followed: boolean | null
+  evidence_supports_marks: boolean | null
+  missed_valid_concepts: string[]
+  unsupported_assumptions: string[]
+  criterion_notes: { criterion: string; fair: boolean; suggested_awarded: number; note: string }[]
+  comment: string | null
+}
+
+export interface MathCheck {
+  status: 'match' | 'mismatch' | 'uncertain'
+  expected: string | null
+  student: string | null
+  step_errors: { line: number; text: string }[]
+  detail: string
+}
+
 export interface EvaluationQuestion {
   question_id: string
   label: string
+  question_type: QuestionType
   answer_status: AnswerStatus
   awarded: number | null
+  teacher_awarded: number | null
+  final_awarded: number | null
   max_marks: number
   feedback: string | null
   missing_concepts: string[]
   flags: string[]
+  similarity: number | null
+  math_check: MathCheck | null
+  teacher_comment: string | null
   answer_text: string | null
   criteria: EvaluationCriterion[]
+  verification: Verification | null
+}
+
+export type ReviewStatus = 'pending' | 'approved' | 'rejected'
+export type VerificationStatus = 'pending' | 'completed' | 'skipped' | 'failed'
+
+export interface EvaluationQueueItem {
+  evaluation_id: string
+  submission_id: string
+  submission_code: string
+  submission_status: SubmissionStatus
+  exam_id: string
+  exam_title: string
+  student_name: string
+  student_number: string
+  total_awarded: number | null
+  final_total: number | null
+  total_max: number
+  flags: string[]
+  verification_status: VerificationStatus
+  review_status: ReviewStatus
+  completed_at: string | null
+}
+
+export interface HistoryEntry {
+  action: string
+  summary: string
+  actor_name: string | null
+  changes: { question: string; field: string; old: string | null; new: string | null }[]
+  created_at: string
 }
 
 export interface Evaluation {
@@ -482,8 +543,14 @@ export interface Evaluation {
   model: string
   total_awarded: number | null
   total_max: number
+  final_total: number | null
   flags: string[]
   started_at: string
   completed_at: string | null
+  verification_status: VerificationStatus
+  review_status: ReviewStatus
+  teacher_comment: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
   questions: EvaluationQuestion[]
 }

@@ -10,7 +10,10 @@ import type {
   ExamStatus,
   ExamType,
   Evaluation,
+  EvaluationQueueItem,
   ExtractionView,
+  HistoryEntry,
+  ReviewStatus,
   ModelAnswerUploadResult,
   ModelConfig,
   ModelInfo,
@@ -247,4 +250,26 @@ export const processingApi = {
   correctAnswers: (id: string, answers: { question_id: string; text: string; status: AnswerStatus }[], confirm: boolean) =>
     data(http.put<ExtractionView>(`/submissions/${id}/extracted-answers`, { answers, confirm })),
   evaluation: (id: string) => data(http.get<Evaluation>(`/submissions/${id}/evaluation`)),
+}
+
+export interface QuestionReviewPayload {
+  question_id: string
+  criteria?: { criterion_id: string; teacher_awarded: number | null }[]
+  teacher_awarded?: number | null
+  teacher_comment?: string | null
+}
+
+export const reviewApi = {
+  queue: (params: { exam_id?: string; review_status?: ReviewStatus; flagged_only?: boolean } = {}) =>
+    data(http.get<EvaluationQueueItem[]>('/evaluations', { params })),
+  save: (id: string, questions: QuestionReviewPayload[], teacher_comment?: string | null) =>
+    data(http.put<Evaluation>(`/evaluations/${id}/review`, teacher_comment === undefined ? { questions } : { questions, teacher_comment })),
+  approve: (id: string) => data(http.post<Evaluation>(`/evaluations/${id}/approve`)),
+  reopen: (id: string) => data(http.post<Evaluation>(`/evaluations/${id}/reopen`)),
+  reject: (id: string, reason: string) =>
+    data(http.post<SubmissionDetail>(`/evaluations/${id}/reject`, { reason }, { timeout: 300_000 })),
+  verify: (id: string) => data(http.post<SubmissionDetail>(`/evaluations/${id}/verify`, undefined, { timeout: 300_000 })),
+  history: (id: string) => data(http.get<HistoryEntry[]>(`/evaluations/${id}/history`)),
+  approveUnflagged: (examId: string) =>
+    data(http.post<{ approved: number; skipped: number }>(`/exams/${examId}/approve-unflagged`)),
 }
