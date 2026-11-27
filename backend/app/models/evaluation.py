@@ -36,6 +36,25 @@ class EvaluationStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class ReviewStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"  # sent back for re-marking
+
+
+class VerificationStatus(str, enum.Enum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    SKIPPED = "skipped"    # no verifier model configured; local checks still ran
+    FAILED = "failed"
+
+
+class VerifierVerdict(str, enum.Enum):
+    AGREES = "agrees"
+    DISAGREES = "disagrees"
+    FAILED = "failed"
+
+
 class ExtractedAnswer(UUIDPrimaryKey, Timestamps, Base):
     __tablename__ = "extracted_answers"
     __table_args__ = (UniqueConstraint("submission_id", "question_id", name="uq_extracted_answers_submission_question"),)
@@ -75,6 +94,19 @@ class Evaluation(UUIDPrimaryKey, Base):
     started_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
+    verification_status: Mapped[str] = mapped_column(
+        String(20), default=VerificationStatus.PENDING.value, server_default=VerificationStatus.PENDING.value
+    )
+    # Teacher review. The AI scores above are never overwritten; teacher marks are stored
+    # alongside them and the backend recomputes `final_total` from both.
+    review_status: Mapped[str] = mapped_column(
+        String(20), default=ReviewStatus.PENDING.value, server_default=ReviewStatus.PENDING.value
+    )
+    final_total: Mapped[Decimal | None] = mapped_column(MARKS, nullable=True)
+    teacher_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
     submission: Mapped[Submission] = relationship()
     questions: Mapped[list["EvaluationQuestion"]] = relationship(
         back_populates="evaluation", cascade="all, delete-orphan", order_by="EvaluationQuestion.position"
@@ -95,8 +127,17 @@ class EvaluationQuestion(UUIDPrimaryKey, Base):
     feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
     missing_concepts: Mapped[list[str]] = mapped_column(JSON, default=list)
     flags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # Local signals: cosine similarity to the model answer, and the SymPy check result.
+    similarity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    math_check: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Teacher overrides: a whole-question mark (used when set) and a comment.
+    teacher_awarded: Mapped[Decimal | None] = mapped_column(MARKS, nullable=True)
+    teacher_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     evaluation: Mapped[Evaluation] = relationship(back_populates="questions")
+    verification: Mapped["VerificationResult | None"] = relationship(
+        back_populates="question", cascade="all, delete-orphan", uselist=False
+    )
     criteria: Mapped[list["EvaluationCriterion"]] = relationship(
         back_populates="question", cascade="all, delete-orphan", order_by="EvaluationCriterion.position"
     )
@@ -117,6 +158,7 @@ class EvaluationCriterion(UUIDPrimaryKey, Base):
     awarded: Mapped[Decimal] = mapped_column(MARKS)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     missing_concepts: Mapped[list[str]] = mapped_column(JSON, default=list)
+    teacher_awarded: Mapped[Decimal | None] = mapped_column(MARKS, nullable=True)
 
     question: Mapped[EvaluationQuestion] = relationship(back_populates="criteria")
     rubric_criterion: Mapped[RubricCriterion | None] = relationship()
@@ -136,3 +178,27 @@ class EvaluationEvidence(UUIDPrimaryKey, Base):
     found_in_answer: Mapped[bool] = mapped_column(Boolean)
 
     criterion: Mapped[EvaluationCriterion] = relationship(back_populates="evidence")
+
+
+class VerificationResult(UUIDPrimaryKey, Base):
+    """The independent verifier's view of one marked question. Never averaged with the evaluator."""
+
+    __tablename__ = "verification_results"
+
+    evaluation_question_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("evaluation_questions.id", ondelete="CASCADE"), unique=True
+    )
+    provider: Mapped[str] = mapped_column(String(30))
+    model: Mapped[str] = mapped_column(String(200))
+    same_model_as_evaluator: Mapped[bool] = mapped_column(Boolean, default=False)
+    verdict: Mapped[str] = mapped_column(String(20))
+    suggested_awarded: Mapped[Decimal | None] = mapped_column(MARKS, nullable=True)
+    rubric_followed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    evidence_supports_marks: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    missed_valid_concepts: Mapped[list[str]] = mapped_column(JSON, default=list)
+    unsupported_assumptions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    criterion_notes: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+    question: Mapped[EvaluationQuestion] = relationship(back_populates="verification")

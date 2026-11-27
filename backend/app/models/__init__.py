@@ -12,6 +12,10 @@ from app.models.evaluation import (
     EvaluationStatus,
     ExtractedAnswer,
     ExtractionSource,
+    ReviewStatus,
+    VerificationResult,
+    VerificationStatus,
+    VerifierVerdict,
 )
 from app.models.exam import (
     AnswerSource,
@@ -40,6 +44,10 @@ __all__ = [
     "EvaluationStatus",
     "ExtractedAnswer",
     "ExtractionSource",
+    "ReviewStatus",
+    "VerificationResult",
+    "VerificationStatus",
+    "VerifierVerdict",
     "KeyStatus",
     "ModelConfig",
     "ModelSlot",
