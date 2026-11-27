@@ -60,7 +60,7 @@ class ExtractedAnswer(UUIDPrimaryKey, Timestamps, Base):
     __table_args__ = (UniqueConstraint("submission_id", "question_id", name="uq_extracted_answers_submission_question"),)
 
     submission_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("submissions.id", ondelete="CASCADE"), index=True)
-    question_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("questions.id", ondelete="CASCADE"))
+    question_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("questions.id", ondelete="CASCADE"), index=True)
     text: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(20), default=AnswerStatus.ANSWERED.value)
     source: Mapped[str] = mapped_column(String(20))
@@ -117,7 +117,7 @@ class EvaluationQuestion(UUIDPrimaryKey, Base):
     __tablename__ = "evaluation_questions"
 
     evaluation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluations.id", ondelete="CASCADE"), index=True)
-    question_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("questions.id", ondelete="CASCADE"))
+    question_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("questions.id", ondelete="CASCADE"), index=True)
     position: Mapped[int] = mapped_column(Integer)
     label: Mapped[str] = mapped_column(String(30))
     answer_status: Mapped[str] = mapped_column(String(20))
@@ -150,7 +150,7 @@ class EvaluationCriterion(UUIDPrimaryKey, Base):
         ForeignKey("evaluation_questions.id", ondelete="CASCADE"), index=True
     )
     rubric_criterion_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("rubric_criteria.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("rubric_criteria.id", ondelete="SET NULL"), nullable=True, index=True
     )
     position: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(String(200))
@@ -216,7 +216,7 @@ class FinalResult(UUIDPrimaryKey, Base):
     submission_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("submissions.id", ondelete="CASCADE"), unique=True)
     exam_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("exams.id", ondelete="CASCADE"), index=True)
     student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    evaluation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluations.id", ondelete="CASCADE"))
+    evaluation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluations.id", ondelete="CASCADE"), index=True)
     total: Mapped[Decimal] = mapped_column(MARKS)
     max_marks: Mapped[Decimal] = mapped_column(MARKS)
     percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2))

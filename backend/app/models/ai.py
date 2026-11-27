@@ -85,7 +85,9 @@ class UsageLog(UUIDPrimaryKey, Base):
     submission_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("submissions.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    exam_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("exams.id", ondelete="SET NULL"), nullable=True)
+    exam_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("exams.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
