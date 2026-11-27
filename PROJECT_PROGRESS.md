@@ -11,7 +11,7 @@ A feature is marked done only when it is implemented, tested and working end to 
 | 3 | Student submission: exam access, script upload, attempts, submission records | ✅ Done |
 | 4 | AI integration: BYOK, provider adapters, router, extraction, evaluation, background jobs | ✅ Done |
 | 5 | Advanced evaluation: verification, SymPy, similarity, review flags, teacher review | ✅ Done |
-| 6 | Results and analytics | ⬜ |
+| 6 | Results and analytics: release modes, publication, student results, PDF/CSV, analytics | ✅ Done |
 | 7 | Production readiness | ⬜ |
 
 ---
@@ -263,9 +263,41 @@ A feature is marked done only when it is implemented, tested and working end to 
 - ✅ Real browser run with the Celery worker, the local Sentence Transformers model and a stub
   verifier: checks re-run from the API, review queue, override and approval, review history
 
-## Phase 6 — Results and analytics ⬜
-- ⬜ Result publication modes, student result page, PDF reports
-- ⬜ Analytics dashboard with Recharts, CSV export
+## Phase 6 — Results and analytics ✅
+
+### Release and publication
+- ✅ Per-exam release mode: after teacher approval (default) or provisional marks, changeable
+  at any time; option to include the teacher's review comments
+- ✅ Publish approved results one by one or all at once; each publication stores an
+  immutable snapshot; withdraw returns the submission to approved so it can be reopened
+- ✅ Provisional results show only when marking is complete, are clearly labelled and never
+  include review comments
+
+### Students
+- ✅ My Results list, result page with criterion marks, feedback and concepts to improve,
+  links from the dashboard and the submission page
+- ✅ Student responses contain no AI provider, model, flag, evidence or model-answer data
+
+### Reports and analytics
+- ✅ PDF result report and class report rendered from escaped HTML with PyMuPDF; Noto Sans
+  embedded and subset (about 50 KB per report) so names and punctuation render correctly
+- ✅ CSV export with per-question marks; formula injection neutralised
+- ✅ Analytics from teacher-approved marks only: average, median, highest, lowest,
+  distribution, per-question averages, weakest questions, missing concepts per student
+- ✅ Dependency-free SVG charts with hover/focus tooltips and a table view
+
+### Fixed along the way
+- ✅ Missing concepts were counted per occurrence (a student could count several times)
+- ✅ Embedded report font made PDFs about 1 MB; fonts are now subset
+
+### Tests
+- ✅ Backend: 192 tests in total — hidden until published, publish rules, comments withheld,
+  withdraw and reopen, provisional mode, bulk publish, privacy across students and teachers,
+  PDF content, CSV escaping, analytics numbers from approved marks only
+- ✅ Frontend: 41 tests in total — publish actions, release settings payload, analytics and
+  table view, provisional and final result pages, axis ticks
+- ✅ Real browser run: switching to provisional, student provisional view, publishing from a
+  row and in bulk, CSV and class report downloads, analytics tooltips, student PDF and mobile layout
 
 ## Phase 7 — Production readiness ⬜
 - ⬜ Redis + background workers, Docker Compose, deployment guide

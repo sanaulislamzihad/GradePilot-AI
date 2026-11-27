@@ -7,7 +7,7 @@ GradePilot AI helps teachers mark examination scripts against a rubric they appr
 The AI suggests marks with evidence for every criterion; teachers review, adjust and
 publish the final result. AI marks are never treated as final on their own.
 
-The project is built in phases. **Phases 1 to 5 are complete**:
+The project is built in phases. **Phases 1 to 6 are complete**:
 
 - **Phase 1 — Foundation:** authentication, role-based access control, course and section
   management, and dashboards for teachers, students and administrators.
@@ -24,6 +24,9 @@ The project is built in phases. **Phases 1 to 5 are complete**:
 - **Phase 5 — Advanced evaluation:** independent verification by a second model, SymPy
   checks of mathematical answers, a local semantic-similarity signal, review flags, and the
   teacher review workflow (overrides, comments, approval, re-marking, change history).
+- **Phase 6 — Results and analytics:** result release modes (after approval or provisional),
+  publishing and withdrawing results, a student results area, PDF result reports, CSV export,
+  and class analytics from teacher-approved marks.
 
 See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md) for the status of every phase.
 
@@ -35,7 +38,7 @@ See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md) for the status of every phase.
 |-----------|------------|
 | Frontend  | React 19, Vite, TypeScript, Tailwind CSS v4, React Router, React Hook Form, Zod, Radix UI, Lucide |
 | Backend   | Python 3.11, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic |
-| Documents | PyMuPDF (PDF text and page rendering), python-docx, Pillow, OpenCV (image preprocessing) |
+| Documents | PyMuPDF (PDF text and page rendering, PDF reports with embedded Noto Sans from `pymupdf-fonts`), python-docx, Pillow, OpenCV (image preprocessing) |
 | AI        | Provider adapters for Gemini, OpenAI, Anthropic Claude (official SDK), DeepSeek, Groq, OpenRouter; AES-256-GCM key encryption (`cryptography`) |
 | Jobs      | Celery — Redis broker in production, SQLite-backed broker for local development |
 | Database  | PostgreSQL (production) · SQLite (local development and tests) |
@@ -45,7 +48,7 @@ See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md) for the status of every phase.
 
 | Local checks | SymPy (symbolic answer checks), Sentence Transformers all-MiniLM-L6-v2 (similarity, CPU, no API key) |
 
-Planned for later phases: Recharts (analytics, Phase 6) and Docker Compose (Phase 7).
+Charts are small hand-written SVG components (no chart library). Planned for Phase 7: Docker Compose.
 
 ## Repository layout
 
@@ -292,6 +295,32 @@ for a fresh marking run with a reason, re-run the checks, or reopen an approval 
 results are released. AI scores are kept unchanged; the server recalculates every final mark
 and validates it against its maximum. Every change is recorded in the review history.
 
+## Results and analytics (Phase 6)
+
+Each exam has a **release setting**, which the teacher can change at any time on the
+**Results** page:
+
+- **Release after teacher approval** (default). Students see nothing until the teacher
+  approves the evaluation and publishes the result.
+- **Show provisional marks.** Students see the AI-suggested marks as soon as marking
+  finishes, clearly labelled provisional. Review comments are never shown on provisional
+  results, and final marks still need approval and publication.
+
+Publishing stores a snapshot of the approved marks, so a published result never changes
+underneath the student. It can be published one at a time or for every approved submission at
+once, and it can be withdrawn (which also allows the evaluation to be reopened). An option per
+exam controls whether the teacher's review comments are included.
+
+Students find their results under **My Results**: total and percentage, marks and comments
+per rubric criterion, feedback, the concepts to work on, and a downloadable PDF. No model,
+provider, flag, evidence or model-answer detail is ever sent to a student.
+
+The **Analytics** page uses teacher-approved marks only: average, median, highest and lowest
+mark, a score distribution, average score per question, the weakest questions, and the
+concepts most often missed (counted once per student). Every chart has a table view. The
+teacher can download a class report (PDF) and the marks as CSV; CSV cells that a spreadsheet
+would run as a formula are prefixed with an apostrophe.
+
 ## API overview
 
 | Area | Endpoints |
@@ -313,6 +342,8 @@ and validates it against its maximum. Every change is recorded in the review his
 | Processing | `POST /api/submissions/{id}/extract` · `POST /api/submissions/{id}/evaluate` · `POST /api/submissions/{id}/retry` · `POST /api/exams/{id}/process-pending` · `GET/PUT /api/submissions/{id}/extracted-answers` |
 | Evaluations | `GET /api/submissions/{id}/evaluation` · `GET /api/evaluations/{id}` |
 | Review | `GET /api/evaluations` · `PUT /api/evaluations/{id}/review` · `POST /api/evaluations/{id}/approve` · `POST /api/evaluations/{id}/reopen` · `POST /api/evaluations/{id}/reject` · `POST /api/evaluations/{id}/verify` · `GET /api/evaluations/{id}/history` · `POST /api/exams/{id}/approve-unflagged` |
+| Results | `GET /api/exams/{id}/results` · `PATCH /api/exams/{id}/release-settings` · `POST /api/results/{submission_id}/publish` · `POST /api/results/{submission_id}/withdraw` · `POST /api/exams/{id}/publish-results` · `GET /api/results/{submission_id}` · `GET /api/results/{submission_id}/pdf` · `GET /api/student/results` |
+| Analytics and exports | `GET /api/exams/{id}/analytics` · `GET /api/exams/{id}/results.csv` · `GET /api/exams/{id}/report.pdf` |
 | AI drafting | `POST /api/exams/{id}/ocr-question-paper` · `POST /api/questions/{id}/model-answer/generate` · `POST /api/questions/{id}/rubric/suggest` |
 | Public | `GET /api/public/exams/{slug}` |
 | Health | `GET /api/health` |
