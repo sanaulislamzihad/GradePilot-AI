@@ -46,6 +46,10 @@ _SUMMARIES: dict[str, str] = {
     "exam.paper_ocr": "Read the question paper of {title} with AI",
     "question.ai_answer": "Drafted a model answer with AI for {title}",
     "question.ai_rubric": "Drafted a rubric with AI for {title}",
+    "evaluation.review": "Changed marks or comments on {code}",
+    "evaluation.approve": "Approved the marks of {code} ({final_total})",
+    "evaluation.reopen": "Reopened the marks of {code}",
+    "evaluation.reject": "Sent {code} back for re-marking",
     "submission.create": "Submitted attempt {attempt} for {title} ({code})",
     "enrollment.leave": "Left {code} section {section}",
 }

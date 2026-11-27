@@ -6,12 +6,15 @@ reviews and publishes them (Phases 5 and 6).
 
 import uuid
 
-from fastapi import APIRouter
+from typing import Annotated
+
+from fastapi import APIRouter, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import Client, DbSession, TeacherUser
 from app.core.errors import AppError
+from app.models.audit_log import AuditLog
 from app.models.evaluation import (
     AnswerStatus,
     Evaluation,
@@ -19,21 +22,29 @@ from app.models.evaluation import (
     EvaluationQuestion,
     ExtractedAnswer,
     ExtractionSource,
+    ReviewStatus,
 )
+from app.models.user import User
 from app.models.exam import Exam, ExamStatus, Question
 from app.models.submission import Submission, SubmissionStatus as S
 from app.schemas.evaluation import (
+    BulkApproveResult,
     EvaluationCriterionRead,
     EvaluationQuestionRead,
+    EvaluationQueueItem,
     EvaluationRead,
     EvidenceRead,
     ExtractedAnswerRead,
     ExtractedAnswersUpdate,
     ExtractionView,
+    HistoryEntry,
     ProcessPendingResult,
+    RejectRequest,
+    ReviewUpdate,
+    VerificationRead,
 )
 from app.schemas.submission import SubmissionDetail
-from app.services import audit, processing
+from app.services import audit, processing, review
 from app.services import submission_service as subs
 from app.services.exam_service import get_owned_exam, leaves
 
@@ -188,41 +199,76 @@ def correct_extracted_answers(
     return _extraction_view(db, _owned_submission(db, teacher, submission_id))
 
 
-# --- Evaluation results ----------------------------------------------------
+# --- Evaluation results and teacher review ---------------------------------
+
+_EVAL_LOAD = (
+    selectinload(Evaluation.questions).selectinload(EvaluationQuestion.criteria).selectinload(EvaluationCriterion.evidence),
+    selectinload(Evaluation.questions).selectinload(EvaluationQuestion.criteria).selectinload(EvaluationCriterion.rubric_criterion),
+    selectinload(Evaluation.questions).selectinload(EvaluationQuestion.verification),
+)
+
+
+def _verification_read(v) -> VerificationRead | None:
+    if v is None:
+        return None
+    return VerificationRead(
+        provider=v.provider, model=v.model, same_model_as_evaluator=v.same_model_as_evaluator,
+        verdict=v.verdict, suggested_awarded=v.suggested_awarded, rubric_followed=v.rubric_followed,
+        evidence_supports_marks=v.evidence_supports_marks, missed_valid_concepts=v.missed_valid_concepts,
+        unsupported_assumptions=v.unsupported_assumptions, criterion_notes=v.criterion_notes, comment=v.comment,
+    )
+
 
 def _evaluation_read(db: Session, evaluation: Evaluation) -> EvaluationRead:
     answers = {
         a.question_id: a.text
         for a in db.scalars(select(ExtractedAnswer).where(ExtractedAnswer.submission_id == evaluation.submission_id))
     }
+    types = dict(db.execute(
+        select(Question.id, Question.question_type).where(Question.id.in_([q.question_id for q in evaluation.questions]))
+    ).all())
+    reviewer = db.get(User, evaluation.reviewed_by_id) if evaluation.reviewed_by_id else None
     return EvaluationRead(
         id=evaluation.id, submission_id=evaluation.submission_id, run_number=evaluation.run_number,
-        is_current=evaluation.is_current, status=evaluation.status,  # type: ignore[arg-type]
+        is_current=evaluation.is_current, status=evaluation.status,
         provider=evaluation.provider, model=evaluation.model, total_awarded=evaluation.total_awarded,
-        total_max=evaluation.total_max, flags=evaluation.flags, started_at=evaluation.started_at,
-        completed_at=evaluation.completed_at,
+        total_max=evaluation.total_max, final_total=evaluation.final_total, flags=evaluation.flags,
+        started_at=evaluation.started_at, completed_at=evaluation.completed_at,
+        verification_status=evaluation.verification_status, review_status=evaluation.review_status,
+        teacher_comment=evaluation.teacher_comment,
+        reviewed_by=reviewer.full_name if reviewer else None, reviewed_at=evaluation.reviewed_at,
         questions=[
             EvaluationQuestionRead(
-                question_id=q.question_id, label=q.label, answer_status=q.answer_status,  # type: ignore[arg-type]
-                awarded=q.awarded, max_marks=q.max_marks, feedback=q.feedback, missing_concepts=q.missing_concepts,
-                flags=q.flags, answer_text=answers.get(q.question_id),
+                question_id=q.question_id, label=q.label, question_type=types.get(q.question_id, "descriptive"),
+                answer_status=q.answer_status, awarded=q.awarded, teacher_awarded=q.teacher_awarded,
+                final_awarded=review.question_final(q), max_marks=q.max_marks, feedback=q.feedback,
+                missing_concepts=q.missing_concepts, flags=q.flags, similarity=q.similarity, math_check=q.math_check,
+                teacher_comment=q.teacher_comment, answer_text=answers.get(q.question_id),
                 criteria=[
                     EvaluationCriterionRead(
-                        name=c.name, max_marks=c.max_marks, awarded=c.awarded, explanation=c.explanation,
-                        missing_concepts=c.missing_concepts,
+                        id=c.id, name=c.name, max_marks=c.max_marks, awarded=c.awarded,
+                        teacher_awarded=c.teacher_awarded, final_awarded=review.criterion_final(c),
+                        explanation=c.explanation, missing_concepts=c.missing_concepts,
                         evidence=[EvidenceRead(quote=e.quote, found_in_answer=e.found_in_answer) for e in c.evidence],
                     )
                     for c in q.criteria
                 ],
+                verification=_verification_read(q.verification),
             )
             for q in evaluation.questions
         ],
     )
 
 
-_EVAL_LOAD = (
-    selectinload(Evaluation.questions).selectinload(EvaluationQuestion.criteria).selectinload(EvaluationCriterion.evidence),
-)
+def _owned_evaluation(db: Session, teacher, evaluation_id: uuid.UUID) -> tuple[Evaluation, Submission]:
+    evaluation = db.scalar(select(Evaluation).where(Evaluation.id == evaluation_id).options(*_EVAL_LOAD))
+    if evaluation is None:
+        raise AppError(404, "Evaluation not found")
+    return evaluation, _owned_submission(db, teacher, evaluation.submission_id)
+
+
+def _final_text(evaluation: Evaluation) -> str:
+    return f"{evaluation.final_total.normalize():f}" if evaluation.final_total is not None else "-"
 
 
 @router.get("/submissions/{submission_id}/evaluation", response_model=EvaluationRead)
@@ -236,11 +282,169 @@ def current_evaluation(submission_id: uuid.UUID, teacher: TeacherUser, db: DbSes
     return _evaluation_read(db, evaluation)
 
 
+def _needs_attention(flags: list[str]) -> bool:
+    return any(flag != "missing_answer" for flag in flags)
+
+
+@router.get("/evaluations", response_model=list[EvaluationQueueItem])
+def evaluation_queue(
+    teacher: TeacherUser,
+    db: DbSession,
+    exam_id: uuid.UUID | None = None,
+    review_status: ReviewStatus | None = None,
+    flagged_only: bool = False,
+    limit: Annotated[int, Query(ge=1, le=500)] = 200,
+) -> list[EvaluationQueueItem]:
+    """Current evaluations of the teacher's latest submissions; flagged pending reviews first."""
+    query = (
+        select(Evaluation, Submission, Exam, User)
+        .join(Submission, Evaluation.submission_id == Submission.id)
+        .join(Exam, Submission.exam_id == Exam.id)
+        .join(User, Submission.student_id == User.id)
+        .where(Exam.teacher_id == teacher.id, Evaluation.is_current.is_(True), Submission.is_latest.is_(True))
+    )
+    if exam_id:
+        query = query.where(Exam.id == exam_id)
+    if review_status:
+        query = query.where(Evaluation.review_status == review_status.value)
+    rows = db.execute(query.order_by(Evaluation.completed_at.desc()).limit(limit)).all()
+    items = [
+        EvaluationQueueItem(
+            evaluation_id=e.id, submission_id=s.id, submission_code=s.code, submission_status=s.status,
+            exam_id=x.id, exam_title=x.title, student_name=u.full_name, student_number=s.student_number,
+            total_awarded=e.total_awarded, final_total=e.final_total, total_max=e.total_max, flags=e.flags,
+            verification_status=e.verification_status, review_status=e.review_status, completed_at=e.completed_at,
+        )
+        for e, s, x, u in rows
+    ]
+    if flagged_only:
+        items = [i for i in items if _needs_attention(i.flags)]
+    items.sort(key=lambda i: (i.review_status != ReviewStatus.PENDING, not _needs_attention(i.flags)))
+    return items
+
+
 @router.get("/evaluations/{evaluation_id}", response_model=EvaluationRead)
 def get_evaluation(evaluation_id: uuid.UUID, teacher: TeacherUser, db: DbSession) -> EvaluationRead:
-    evaluation = db.scalar(select(Evaluation).where(Evaluation.id == evaluation_id).options(*_EVAL_LOAD))
-    if evaluation is None:
-        raise AppError(404, "Evaluation not found")
-    _owned_submission(db, teacher, evaluation.submission_id)
+    evaluation, _ = _owned_evaluation(db, teacher, evaluation_id)
     return _evaluation_read(db, evaluation)
 
+
+@router.put("/evaluations/{evaluation_id}/review", response_model=EvaluationRead)
+def save_review(evaluation_id: uuid.UUID, data: ReviewUpdate, teacher: TeacherUser, db: DbSession, client: Client) -> EvaluationRead:
+    """Teacher overrides and comments. The backend recalculates the final marks."""
+    evaluation, submission = _owned_evaluation(db, teacher, evaluation_id)
+    if submission.status != S.TEACHER_REVIEW_REQUIRED.value:
+        raise AppError(409, "This submission is not waiting for review")
+    changes = review.apply(evaluation, data.questions, data.teacher_comment, "teacher_comment" in data.model_fields_set)
+    if changes:
+        audit.record(db, "evaluation.review", actor=teacher, entity_type="evaluation", entity_id=evaluation.id,
+                     details={"code": submission.code, "changes": [c.as_dict() for c in changes]},
+                     ip_address=client.ip_address)
+    db.commit()
+    return _evaluation_read(db, evaluation)
+
+
+@router.post("/evaluations/{evaluation_id}/approve", response_model=EvaluationRead)
+def approve_evaluation(evaluation_id: uuid.UUID, teacher: TeacherUser, db: DbSession, client: Client) -> EvaluationRead:
+    evaluation, submission = _owned_evaluation(db, teacher, evaluation_id)
+    if submission.status != S.TEACHER_REVIEW_REQUIRED.value:
+        raise AppError(409, "This submission is not waiting for review")
+    review.approve(evaluation, teacher.id)
+    audit.record(db, "evaluation.approve", actor=teacher, entity_type="evaluation", entity_id=evaluation.id,
+                 details={"code": submission.code, "final_total": _final_text(evaluation)}, ip_address=client.ip_address)
+    db.commit()
+    processing.transition(db, submission.id, (S.TEACHER_REVIEW_REQUIRED,), S.APPROVED)
+    db.expire_all()
+    return _evaluation_read(db, _owned_evaluation(db, teacher, evaluation_id)[0])
+
+
+@router.post("/evaluations/{evaluation_id}/reopen", response_model=EvaluationRead)
+def reopen_evaluation(evaluation_id: uuid.UUID, teacher: TeacherUser, db: DbSession, client: Client) -> EvaluationRead:
+    evaluation, submission = _owned_evaluation(db, teacher, evaluation_id)
+    if evaluation.review_status != ReviewStatus.APPROVED.value or submission.status != S.APPROVED.value:
+        raise AppError(409, "Only approved evaluations that are not yet published can be reopened")
+    evaluation.review_status = ReviewStatus.PENDING.value
+    evaluation.reviewed_at = None
+    evaluation.reviewed_by_id = None
+    audit.record(db, "evaluation.reopen", actor=teacher, entity_type="evaluation", entity_id=evaluation.id,
+                 details={"code": submission.code}, ip_address=client.ip_address)
+    db.commit()
+    processing.transition(db, submission.id, (S.APPROVED,), S.TEACHER_REVIEW_REQUIRED)
+    db.expire_all()
+    return _evaluation_read(db, _owned_evaluation(db, teacher, evaluation_id)[0])
+
+
+@router.post("/evaluations/{evaluation_id}/reject", response_model=SubmissionDetail)
+def reject_evaluation(
+    evaluation_id: uuid.UUID, data: RejectRequest, teacher: TeacherUser, db: DbSession, client: Client
+) -> SubmissionDetail:
+    """Send the answers back for a fresh AI marking run; the reason stays with the old run."""
+    evaluation, submission = _owned_evaluation(db, teacher, evaluation_id)
+    review.ensure_reviewable(evaluation)
+    evaluation.review_status = ReviewStatus.REJECTED.value
+    evaluation.teacher_comment = data.reason
+    evaluation.reviewed_by_id = teacher.id
+    audit.record(db, "evaluation.reject", actor=teacher, entity_type="evaluation", entity_id=evaluation.id,
+                 details={"code": submission.code, "reason": data.reason[:300]}, ip_address=client.ip_address)
+    db.commit()
+    try:
+        processing.queue(db, submission, evaluate_only=True)
+    except AppError:
+        evaluation.review_status = ReviewStatus.PENDING.value  # stay reviewable if marking cannot start
+        db.commit()
+        raise
+    return _detail(db, teacher, submission.id)
+
+
+@router.post("/evaluations/{evaluation_id}/verify", response_model=SubmissionDetail)
+def verify_evaluation(evaluation_id: uuid.UUID, teacher: TeacherUser, db: DbSession) -> SubmissionDetail:
+    """Run the independent checks again, for example after setting up a verifier model."""
+    evaluation, submission = _owned_evaluation(db, teacher, evaluation_id)
+    review.ensure_reviewable(evaluation)
+    processing.queue_verification(db, submission)
+    return _detail(db, teacher, submission.id)
+
+
+@router.get("/evaluations/{evaluation_id}/history", response_model=list[HistoryEntry])
+def evaluation_history(evaluation_id: uuid.UUID, teacher: TeacherUser, db: DbSession) -> list[HistoryEntry]:
+    """Every teacher action on any marking run of this submission, newest first."""
+    _, submission = _owned_evaluation(db, teacher, evaluation_id)
+    run_ids = [str(i) for i in db.scalars(select(Evaluation.id).where(Evaluation.submission_id == submission.id))]
+    entries = db.scalars(
+        select(AuditLog)
+        .where(AuditLog.entity_type == "evaluation", AuditLog.entity_id.in_(run_ids))
+        .options(selectinload(AuditLog.actor))
+        .order_by(AuditLog.created_at.desc())
+    ).all()
+    return [
+        HistoryEntry(action=e.action, summary=audit.describe(e), actor_name=e.actor.full_name if e.actor else None,
+                     changes=(e.details or {}).get("changes", []), created_at=e.created_at)
+        for e in entries
+    ]
+
+
+@router.post("/exams/{exam_id}/approve-unflagged", response_model=BulkApproveResult)
+def approve_unflagged(exam_id: uuid.UUID, teacher: TeacherUser, db: DbSession, client: Client) -> BulkApproveResult:
+    """Approve every pending evaluation of an exam that has no review flags."""
+    exam = get_owned_exam(db, teacher, exam_id)
+    rows = db.execute(
+        select(Evaluation, Submission)
+        .join(Submission, Evaluation.submission_id == Submission.id)
+        .where(Submission.exam_id == exam.id, Submission.is_latest.is_(True), Evaluation.is_current.is_(True),
+               Evaluation.review_status == ReviewStatus.PENDING.value,
+               Submission.status == S.TEACHER_REVIEW_REQUIRED.value)
+        .options(selectinload(Evaluation.questions).selectinload(EvaluationQuestion.criteria))
+    ).all()
+    approved = skipped = 0
+    for evaluation, submission in rows:
+        if not review.is_clean(evaluation):
+            skipped += 1
+            continue
+        review.approve(evaluation, teacher.id)
+        audit.record(db, "evaluation.approve", actor=teacher, entity_type="evaluation", entity_id=evaluation.id,
+                     details={"code": submission.code, "final_total": _final_text(evaluation), "bulk": True},
+                     ip_address=client.ip_address)
+        db.commit()
+        processing.transition(db, submission.id, (S.TEACHER_REVIEW_REQUIRED,), S.APPROVED)
+        approved += 1
+    return BulkApproveResult(approved=approved, skipped=skipped)
