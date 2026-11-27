@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     # Off by default: a user-supplied URL makes the server send requests to it.
     allow_custom_ai_endpoints: bool = False
 
+    # Local semantic similarity signal (Sentence Transformers, CPU).
+    similarity_enabled: bool = True
+    similarity_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+
     # Simple per-process limiter for credential endpoints.
     auth_rate_limit_attempts: int = 10
     auth_rate_limit_window_seconds: int = 300
