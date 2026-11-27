@@ -189,3 +189,60 @@ SUGGEST_RUBRIC_SYSTEM = (
 def suggest_rubric_prompt(question: str, marks: str, question_type: str, model_answer: str | None) -> str:
     answer = f"\n\nModel answer:\n{model_answer}" if model_answer else ""
     return f"Question ({question_type}, {marks} marks):\n{question}{answer}\n\nThe criteria must total exactly {marks} marks."
+
+
+# --- Independent verification ----------------------------------------------
+
+class CriterionAudit(BaseModel):
+    id: str
+    fair: bool
+    suggested_awarded: float
+    note: str
+
+
+class VerificationReport(BaseModel):
+    criteria: list[CriterionAudit]
+    rubric_followed: bool
+    evidence_supports_marks: bool
+    missed_valid_concepts: list[str] = Field(default_factory=list)
+    unsupported_assumptions: list[str] = Field(default_factory=list)
+    comment: str
+
+
+VERIFICATION_SCHEMA = _obj({
+    "criteria": {"type": "array", "items": _obj({
+        "id": _STR, "fair": {"type": "boolean"}, "suggested_awarded": _NUM, "note": _STR,
+    })},
+    "rubric_followed": {"type": "boolean"},
+    "evidence_supports_marks": {"type": "boolean"},
+    "missed_valid_concepts": _STR_LIST,
+    "unsupported_assumptions": _STR_LIST,
+    "comment": _STR,
+})
+
+VERIFICATION_SYSTEM = (
+    "You are an independent second examiner auditing marks given by another examiner. Check that the rubric was "
+    "followed, that no criterion exceeds its maximum, that the quoted evidence really supports each mark, whether "
+    "valid concepts or acceptable alternative answers were missed, and whether the marker assumed anything the "
+    "answer does not say. For every criterion say whether the mark is fair and give the mark you would award, in "
+    "steps of 0.25. Judge independently; do not simply agree. " + DATA_RULE
+)
+
+
+def verification_prompt(question: str, max_marks: str, model_answer: str, answer: str,
+                        criteria: list[tuple[str, str, str | None, str, str, list[str], str | None]],
+                        signals: list[str]) -> str:
+    lines = []
+    for cid, name, description, maximum, awarded, evidence, explanation in criteria:
+        quoted = "; ".join(f'"{e}"' for e in evidence) or "none"
+        lines.append(
+            f"- {cid}: {name} (max {maximum}){f' — {description}' if description else ''}\n"
+            f"  First examiner awarded {awarded}. Evidence: {quoted}. Reason: {explanation or 'none given'}"
+        )
+    checks = ("\n\nAutomatic checks:\n" + "\n".join(f"- {s}" for s in signals)) if signals else ""
+    return (
+        f"Question ({max_marks} marks):\n{question}\n\n"
+        f"Model answer approved by the teacher:\n{model_answer}\n\n"
+        f"First examiner's marks (audit each id exactly once):\n" + "\n".join(lines) + checks +
+        f"\n\n<student_answer>\n{answer}\n</student_answer>"
+    )

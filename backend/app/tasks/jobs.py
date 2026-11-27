@@ -18,3 +18,9 @@ def process_submission(submission_id: str) -> None:
 def evaluate_submission(submission_id: str) -> None:
     with SessionLocal() as db:
         processing.run_evaluation(db, uuid.UUID(submission_id))
+
+
+@celery_app.task(name="gradepilot.verify_submission")
+def verify_submission(submission_id: str) -> None:
+    with SessionLocal() as db:
+        processing.run_verification(db, uuid.UUID(submission_id))

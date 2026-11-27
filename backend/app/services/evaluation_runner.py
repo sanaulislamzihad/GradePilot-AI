@@ -26,7 +26,7 @@ from app.models.evaluation import (
 from app.models.exam import QuestionType
 from app.models.submission import Submission
 from app.providers.base import AIInvalidResponseError, AIRequest
-from app.services import ai_router
+from app.services import ai_router, review
 from app.services.exam_service import fmt, leaves
 from app.services.prompts import EVALUATION_SCHEMA, EVALUATION_SYSTEM, QuestionScore, evaluation_prompt
 
@@ -174,6 +174,7 @@ def evaluate(db: Session, submission: Submission) -> Evaluation:
         assert evaluation.total_awarded <= exam.total_marks
     evaluation.flags = sorted(all_flags)
     evaluation.completed_at = utcnow()
+    review.recompute(evaluation)
 
     db.execute(update(Evaluation).where(Evaluation.submission_id == submission.id).values(is_current=False))
     evaluation.is_current = True

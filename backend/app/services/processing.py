@@ -18,7 +18,8 @@ from app.models.evaluation import ExtractedAnswer
 from app.models.exam import Exam, Question, Rubric
 from app.models.submission import Submission, SubmissionStatus as S
 from app.providers.base import AIConfigurationError, AIError
-from app.services import ai_router, evaluation_runner, extraction
+from app.models.evaluation import Evaluation, EvaluationCriterion, EvaluationQuestion
+from app.services import ai_router, evaluation_runner, extraction, verification
 
 logger = logging.getLogger("gradepilot.processing")
 
@@ -28,6 +29,8 @@ MESSAGES = {
     S.OCR_REVIEW_REQUIRED: "Your teacher is checking how your script was read.",
     S.READY_FOR_EVALUATION: "Your script has been read and is ready for marking.",
     S.EVALUATING: "Your answers are being marked.",
+    S.VERIFYING: "Your marks are being checked.",
+    S.APPROVED: "Marking is complete. Your teacher will release the results.",
     S.TEACHER_REVIEW_REQUIRED: "Marking is complete and waiting for your teacher's review.",
     S.FAILED: "Processing could not finish. Your teacher has been notified.",
 }
@@ -87,12 +90,51 @@ def run_evaluation(db: Session, submission_id: uuid.UUID) -> None:
     if submission is None:
         return
     try:
-        evaluation_runner.evaluate(db, submission)
+        evaluation = evaluation_runner.evaluate(db, submission)
         db.commit()
+        evaluation_id = evaluation.id
     except Exception as exc:  # noqa: BLE001 - every failure must leave a visible status
         _fail(db, submission_id, S.EVALUATING, exc)
         return
-    transition(db, submission_id, (S.EVALUATING,), S.TEACHER_REVIEW_REQUIRED)
+    if transition(db, submission_id, (S.EVALUATING,), S.VERIFYING):
+        _verify(db, submission_id, evaluation_id)
+
+
+def _load_evaluation(db: Session, evaluation_id: uuid.UUID) -> Evaluation | None:
+    db.expire_all()
+    return db.scalar(
+        select(Evaluation).where(Evaluation.id == evaluation_id).options(
+            selectinload(Evaluation.questions).selectinload(EvaluationQuestion.criteria).selectinload(EvaluationCriterion.evidence),
+            selectinload(Evaluation.questions).selectinload(EvaluationQuestion.criteria).selectinload(EvaluationCriterion.rubric_criterion),
+            selectinload(Evaluation.questions).selectinload(EvaluationQuestion.verification),
+        )
+    )
+
+
+def _verify(db: Session, submission_id: uuid.UUID, evaluation_id: uuid.UUID) -> None:
+    """Checks never fail a submission: problems become review flags."""
+    try:
+        _load(db, submission_id)  # loads the exam tree the checks need
+        evaluation = _load_evaluation(db, evaluation_id)
+        if evaluation is not None:
+            verification.verify(db, evaluation)
+            db.commit()
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        logger.exception("Verification failed for evaluation %s", evaluation_id)
+    transition(db, submission_id, (S.VERIFYING,), S.TEACHER_REVIEW_REQUIRED)
+
+
+def run_verification(db: Session, submission_id: uuid.UUID) -> None:
+    if not transition(db, submission_id, (S.QUEUED,), S.VERIFYING):
+        return
+    evaluation_id = db.scalar(
+        select(Evaluation.id).where(Evaluation.submission_id == submission_id, Evaluation.is_current.is_(True))
+    )
+    if evaluation_id is None:
+        transition(db, submission_id, (S.VERIFYING,), S.TEACHER_REVIEW_REQUIRED)
+        return
+    _verify(db, submission_id, evaluation_id)
 
 
 def run_processing(db: Session, submission_id: uuid.UUID) -> None:
@@ -122,6 +164,17 @@ def _dispatch(task_name: str, submission_id: uuid.UUID) -> None:
     from app.tasks import jobs
 
     getattr(jobs, task_name).delay(str(submission_id))
+
+
+def queue_verification(db: Session, submission: Submission) -> None:
+    if not transition(db, submission.id, (S.TEACHER_REVIEW_REQUIRED,), S.QUEUED):
+        raise AppError(409, "Only evaluations waiting for review can be checked again")
+    try:
+        _dispatch("verify_submission", submission.id)
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not queue verification for %s", submission.id)
+        transition(db, submission.id, (S.QUEUED,), S.TEACHER_REVIEW_REQUIRED)
+        raise AppError(503, "The job queue is unavailable. Try again shortly.") from None
 
 
 def queue(db: Session, submission: Submission, *, evaluate_only: bool = False) -> None:
