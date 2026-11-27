@@ -12,7 +12,7 @@ A feature is marked done only when it is implemented, tested and working end to 
 | 4 | AI integration: BYOK, provider adapters, router, extraction, evaluation, background jobs | ✅ Done |
 | 5 | Advanced evaluation: verification, SymPy, similarity, review flags, teacher review | ✅ Done |
 | 6 | Results and analytics: release modes, publication, student results, PDF/CSV, analytics | ✅ Done |
-| 7 | Production readiness | ⬜ |
+| 7 | Production readiness: security review, Docker, PostgreSQL verification, performance, deployment guide | 🔄 Docker images not yet built and run |
 
 ---
 
@@ -299,6 +299,57 @@ A feature is marked done only when it is implemented, tested and working end to 
 - ✅ Real browser run: switching to provisional, student provisional view, publishing from a
   row and in bulk, CSV and class report downloads, analytics tooltips, student PDF and mobile layout
 
-## Phase 7 — Production readiness ⬜
-- ⬜ Redis + background workers, Docker Compose, deployment guide
-- ⬜ Security review and performance work
+## Phase 7 — Production readiness 🔄
+
+### Security review
+- ✅ Dependency audits: `pip-audit` and `npm audit` report no known vulnerabilities
+- ✅ Code review for raw SQL, unsafe HTML, unsafe deserialisation and secrets in logs: none found
+- ✅ Production guard: the API refuses to start without secure cookies, encryption keys,
+  PostgreSQL and a Redis broker
+- ✅ Rate limits shared through Redis across workers (in-process without Redis); new limits on
+  uploads per student and AI-triggering requests per user; requests allowed and the problem
+  logged if Redis is down
+- ✅ Security headers on API responses (CSP, Permissions-Policy, HSTS in production) and a
+  strict CSP for the app in the nginx image; oversized request bodies refused
+- ✅ Client address cannot be spoofed: nginx overwrites `X-Forwarded-For` (uvicorn trusts the
+  leftmost entry when all proxies are trusted, so appending would have let clients choose
+  their own address and escape rate limits)
+
+### Docker
+- ✅ Backend image (API, worker, migrations; unprivileged user; CPU-only PyTorch)
+- ✅ Frontend image (nginx, unprivileged; same-origin `/api` proxy; asset caching)
+- ✅ Compose stack: PostgreSQL, Redis (append-only), one-off migrations, API, worker, web,
+  health checks, named volumes
+- ✅ Production build checked in a real browser under the exact nginx security headers: QR
+  codes, PDF preview in a blob frame, charts, downloads, deep-link reload — no CSP violations
+- 🔄 Building and running the images with Docker: not done yet, Docker is not installed on the
+  development machine
+
+### PostgreSQL
+- ✅ Migrations upgrade, downgrade and match the models (`alembic check`) on PostgreSQL 16
+- ✅ The full backend suite passes on PostgreSQL (`TEST_DATABASE_URL`) as well as SQLite
+
+### Performance
+- ✅ List endpoints checked for per-row queries; the student result list was fixed and every
+  list now has a test that its query count does not grow with the number of rows
+- ✅ Indexes on foreign keys that PostgreSQL scans when questions or rubric criteria are deleted
+- ✅ Frontend entry chunk from 501 kB to 306 kB (159 kB to 96 kB gzipped) by loading every
+  page and the signed-in layout on demand
+
+### Also completed
+- ✅ Teacher dashboard: evaluated submissions, pending reviews, approved results and average
+  class marks (teacher-approved marks only), as listed in the original specification
+- ✅ Deployment guide in the README: first start, HTTPS, proxies, upgrades, scaling, backups,
+  key rotation, logs
+
+### Fixed along the way
+- ✅ On Windows with Python 3.11 the clock moves in ~15 ms steps, so records created together
+  shared a timestamp and newest-first lists had no defined order; timestamps are now strictly
+  increasing within a process
+- ✅ Running migrations in-process (tests, CLI) silently disabled the application's loggers
+
+### Tests
+- ✅ Backend: 221 tests, passing on both SQLite and PostgreSQL — production settings, Redis
+  limiter shared between workers and failing open, upload and AI limits, request size,
+  headers, query counts for 11 list endpoints, incorrect-answer grading, dashboard numbers
+- ✅ Frontend: 41 tests, lint and type checks clean

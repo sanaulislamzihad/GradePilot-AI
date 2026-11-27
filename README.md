@@ -7,7 +7,7 @@ GradePilot AI helps teachers mark examination scripts against a rubric they appr
 The AI suggests marks with evidence for every criterion; teachers review, adjust and
 publish the final result. AI marks are never treated as final on their own.
 
-The project is built in phases. **Phases 1 to 6 are complete**:
+The project was built in seven phases, **all complete**:
 
 - **Phase 1 — Foundation:** authentication, role-based access control, course and section
   management, and dashboards for teachers, students and administrators.
@@ -27,6 +27,10 @@ The project is built in phases. **Phases 1 to 6 are complete**:
 - **Phase 6 — Results and analytics:** result release modes (after approval or provisional),
   publishing and withdrawing results, a student results area, PDF result reports, CSV export,
   and class analytics from teacher-approved marks.
+- **Phase 7 — Production readiness:** a security review (production configuration guard,
+  shared Redis rate limits, security headers, request size limits), Docker images and a
+  Compose stack, the full test suite verified on PostgreSQL, query and bundle-size work,
+  and a deployment guide.
 
 See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md) for the status of every phase.
 
@@ -48,7 +52,8 @@ See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md) for the status of every phase.
 
 | Local checks | SymPy (symbolic answer checks), Sentence Transformers all-MiniLM-L6-v2 (similarity, CPU, no API key) |
 
-Charts are small hand-written SVG components (no chart library). Planned for Phase 7: Docker Compose.
+Charts are small hand-written SVG components (no chart library). Deployment uses Docker Compose with
+PostgreSQL 16, Redis 7 and nginx.
 
 ## Repository layout
 
@@ -56,28 +61,35 @@ Charts are small hand-written SVG components (no chart library). Planned for Pha
 GradePilot AI/
 ├── backend/
 │   ├── app/
-│   │   ├── api/            # FastAPI routers and dependencies (auth, RBAC)
+│   │   ├── api/            # FastAPI routers and dependencies (auth, RBAC, rate limits)
 │   │   ├── core/           # settings and error handling
 │   │   ├── database/       # engine, session, declarative base
 │   │   ├── models/         # SQLAlchemy models
+│   │   ├── providers/      # AI provider adapters
 │   │   ├── schemas/        # Pydantic request and response models
-│   │   ├── security/       # password hashing, tokens, rate limiting
-│   │   ├── services/       # business rules (auth sessions, courses, audit)
+│   │   ├── security/       # password hashing, tokens, encryption, rate limiting
+│   │   ├── services/       # business rules (exams, marking, review, results, reports)
+│   │   ├── tasks/          # Celery application and background jobs
 │   │   ├── cli.py          # administrative commands
 │   │   └── main.py         # application entry point
 │   ├── migrations/         # Alembic migrations
-│   └── tests/
+│   ├── tests/
+│   ├── Dockerfile          # one image for the API, worker and migrations
+│   └── docker-entrypoint.sh
 ├── frontend/
-│   └── src/
-│       ├── components/     # reusable UI components
-│       ├── contexts/       # auth context
-│       ├── hooks/
-│       ├── layouts/        # app shell, navigation, route guards
-│       ├── pages/          # auth, teacher, student, admin, shared
-│       ├── services/       # HTTP client and typed API calls
-│       ├── types/
-│       └── utils/
+│   ├── src/
+│   │   ├── components/     # reusable UI components and charts
+│   │   ├── contexts/       # auth context
+│   │   ├── hooks/
+│   │   ├── layouts/        # app shell, navigation, route guards
+│   │   ├── pages/          # auth, teacher, student, admin, shared
+│   │   ├── services/       # HTTP client and typed API calls
+│   │   ├── types/
+│   │   └── utils/
+│   ├── docker/             # nginx config and security headers for the production image
+│   └── Dockerfile
 ├── storage/                # private uploads (git-ignored)
+├── docker-compose.yml      # production stack
 ├── .env.example
 ├── PROJECT_PROGRESS.md
 └── README.md
@@ -171,6 +183,13 @@ npm run typecheck
 
 The test suites need no external services and no API keys.
 
+The backend suite runs on SQLite by default. To run the same tests against PostgreSQL,
+point `TEST_DATABASE_URL` at an **empty** database (it is migrated, then cleaned after each test):
+
+```bash
+TEST_DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/gradepilot_test pytest
+```
+
 ## Authentication and security model
 
 - **Roles**: `admin`, `teacher`, `student`. Teachers and students self-register; admins
@@ -186,13 +205,88 @@ The test suites need no external services and no API keys.
   see their own enrollments. Cross-account access returns 404.
 - **Audit log**: sign-ins, profile changes, admin actions and course changes are recorded
   without passwords, tokens or other secrets.
-- Credential endpoints are rate limited (in-process for now; moves to Redis in Phase 7).
+- **Rate limits**: sign-in, registration and password changes per client address; answer
+  script uploads per student; requests that start AI work per user. With
+  `RATE_LIMIT_REDIS_URL` every API worker shares one count in Redis (Docker Compose sets
+  this); without it each process counts on its own, which suits a single worker. If Redis
+  is unreachable, requests are allowed and the problem is logged rather than locking users out.
+- **Production guard**: with `ENVIRONMENT=production` the API refuses to start unless
+  cookies are secure, encryption keys are set, and the database and job broker are
+  PostgreSQL and Redis. API docs are not served in production.
+- **Headers and limits**: API responses carry `Content-Security-Policy: default-src 'none'`,
+  `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` and, in
+  production, HSTS. The nginx image adds a strict CSP for the app itself (scripts only from
+  the same origin). Request bodies above `MAX_REQUEST_SIZE_MB` (60 MB) are refused.
+- **Client addresses behind a proxy**: the API trusts `X-Forwarded-For` only because the
+  nginx container overwrites it with the real client address; the API container is not
+  reachable from outside. See the deployment guide when adding another proxy in front.
 - **Uploads**: file type is decided from the file's bytes and must match its extension;
   images are fully decoded and DOCX archives are checked against zip bombs. Files are saved
   under random names in private storage and served only through an authorised endpoint.
 - **Published exams are locked**: questions, marks, answers and rubrics cannot change while
   students can see the exam. The public exam link shows details only — never questions,
   model answers or rubrics.
+
+## Deployment with Docker (Phase 7)
+
+The Compose stack runs six services: **db** (PostgreSQL 16), **redis** (job queue and shared
+rate limits, append-only so queued jobs survive restarts), **migrate** (applies migrations
+once and exits), **api** (FastAPI, two workers), **worker** (Celery) and **web** (nginx serving
+the built frontend and proxying `/api`). The API and worker start only after migrations
+succeed. The containers run as unprivileged users.
+
+### First start
+
+```bash
+cp .env.example .env
+```
+
+In `.env`, set real values for:
+
+| Variable | How to generate |
+|----------|-----------------|
+| `JWT_SECRET_KEY` | `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
+| `ENCRYPTION_KEYS` | `python -c "import os,base64; print('k1:' + base64.b64encode(os.urandom(32)).decode())"` |
+| `POSTGRES_PASSWORD` | `python -c "import secrets; print(secrets.token_hex(24))"` (letters and digits only) |
+
+Compose sets `ENVIRONMENT=production`, `COOKIE_SECURE=true`, the database URL, Redis URLs and
+the storage path itself; the SQLite values in `.env` are ignored by the containers.
+
+```bash
+docker compose up -d --build
+docker compose exec api python -m app.cli create-admin --email admin@your-institution.edu --name "System Admin"
+```
+
+Open <http://localhost:8080> (change with `HTTP_PORT`). Browsers accept secure cookies on
+`localhost`, so sign-in works there without HTTPS.
+
+### HTTPS and real deployments
+
+Serve the app over HTTPS before real use: put a TLS-terminating reverse proxy or load balancer
+(Caddy, Traefik, a cloud load balancer) in front of the `web` service. Then:
+
+- Let the proxy send HSTS for the app pages (the API already sends it).
+- The `web` container overwrites `X-Forwarded-For` with the address it sees. Behind another
+  proxy that address is the proxy's, so all users would share one rate limit. Enable nginx's
+  realip module in `frontend/docker/nginx.conf` with your proxy's address:
+  `set_real_ip_from 10.0.0.0/8; real_ip_header X-Forwarded-For;`
+- Keep the `api` service unpublished; only `web` should be reachable.
+
+### Operations
+
+- **Upgrades**: `git pull && docker compose up -d --build`. The `migrate` job applies new
+  migrations before the new API starts.
+- **Scaling**: raise `API_WORKERS` and `WORKER_CONCURRENCY`, or run more worker containers
+  (`docker compose up -d --scale worker=3`). Rate limits stay correct because they live in Redis.
+- **Backups**: the database (`docker compose exec db pg_dump -U gradepilot gradepilot > backup.sql`)
+  and the `storage` volume (answer scripts and question papers) must be backed up together.
+  Keep `ENCRYPTION_KEYS` safe as well: without it, stored provider keys cannot be decrypted.
+- **Key rotation**: for `ENCRYPTION_KEYS`, put a new key first and keep the old ones after it
+  (`k2:...,k1:...`). Changing `JWT_SECRET_KEY` signs everyone out.
+- **Logs**: `docker compose logs -f api worker`. Logs never contain passwords, API keys or
+  student answers.
+- **Similarity model**: the worker downloads all-MiniLM-L6-v2 (~90 MB) on first use into the
+  `model-cache` volume. Set `SIMILARITY_ENABLED=false` on servers without internet access.
 
 ## Exam workflow (Phase 2)
 
