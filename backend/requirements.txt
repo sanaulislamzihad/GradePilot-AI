@@ -31,6 +31,9 @@ cryptography>=43
 
 # Background jobs (Redis broker in production; SQLAlchemy broker for local development)
 celery[redis]>=5.4
+# redis-py imports async-timeout on Python older than 3.11.3 without always declaring it
+# (old pip skips its marker on pre-release Pythons such as 3.11.0rc2).
+async-timeout>=4.0; python_version < "3.12"
 
 # Image preprocessing for OCR
 opencv-python-headless>=4.10
