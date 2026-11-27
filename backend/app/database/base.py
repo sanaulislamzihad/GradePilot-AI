@@ -1,7 +1,8 @@
 """Declarative base and shared column helpers."""
 
+import threading
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import DateTime, MetaData, TypeDecorator, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -16,8 +17,25 @@ NAMING_CONVENTION = {
 }
 
 
+_clock_lock = threading.Lock()
+_last_timestamp = datetime.min.replace(tzinfo=UTC)
+_TICK = timedelta(microseconds=1)
+
+
 def utcnow() -> datetime:
-    return datetime.now(UTC)
+    """Current UTC time, strictly increasing within the process.
+
+    Some platforms (Windows with Python 3.11) only advance the wall clock every
+    ~15 ms, so records created in quick succession would share a timestamp and
+    "newest first" lists would have no defined order.
+    """
+    global _last_timestamp
+    with _clock_lock:
+        now = datetime.now(UTC)
+        if now <= _last_timestamp:
+            now = _last_timestamp + _TICK
+        _last_timestamp = now
+        return now
 
 
 def as_utc(value: datetime) -> datetime:

@@ -180,3 +180,10 @@ def test_timestamps_loaded_from_database_are_utc(client: TestClient):
     me = client.get("/api/auth/me", headers=auth(session)).json()
     for field in ("created_at", "last_login_at"):
         assert me[field].endswith(("Z", "+00:00")), me[field]
+
+
+def test_timestamps_are_strictly_increasing():
+    from app.database.base import utcnow
+
+    values = [utcnow() for _ in range(1000)]
+    assert all(later > earlier for earlier, later in zip(values, values[1:]))
