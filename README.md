@@ -7,7 +7,7 @@ GradePilot AI helps teachers mark examination scripts against a rubric they appr
 The AI suggests marks with evidence for every criterion; teachers review, adjust and
 publish the final result. AI marks are never treated as final on their own.
 
-The project is built in phases. **Phases 1 to 3 are complete**:
+The project is built in phases. **Phases 1 to 4 are complete**:
 
 - **Phase 1 — Foundation:** authentication, role-based access control, course and section
   management, and dashboards for teachers, students and administrators.
@@ -17,6 +17,10 @@ The project is built in phases. **Phases 1 to 3 are complete**:
 - **Phase 3 — Student submission:** exam access by link or dashboard, answer script upload
   (one PDF or page images), attempt limits, duplicate protection, submission records and
   teacher submission views.
+- **Phase 4 — AI integration:** bring-your-own-key provider settings with encrypted keys,
+  six provider adapters behind one AI router, model slots with live capability checks,
+  answer extraction (text layer or OCR), rubric-based evaluation with backend score
+  validation, background processing with Celery, and AI drafting of model answers and rubrics.
 
 See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md) for the status of every phase.
 
@@ -28,15 +32,16 @@ See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md) for the status of every phase.
 |-----------|------------|
 | Frontend  | React 19, Vite, TypeScript, Tailwind CSS v4, React Router, React Hook Form, Zod, Radix UI, Lucide |
 | Backend   | Python 3.11, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic |
-| Documents | PyMuPDF (PDF text), python-docx (DOCX text), Pillow (image validation) |
+| Documents | PyMuPDF (PDF text and page rendering), python-docx, Pillow, OpenCV (image preprocessing) |
+| AI        | Provider adapters for Gemini, OpenAI, Anthropic Claude (official SDK), DeepSeek, Groq, OpenRouter; AES-256-GCM key encryption (`cryptography`) |
+| Jobs      | Celery — Redis broker in production, SQLite-backed broker for local development |
 | Database  | PostgreSQL (production) · SQLite (local development and tests) |
 | Security  | Argon2id password hashing, short-lived JWT access tokens, rotating httpOnly refresh cookies |
 | Testing   | pytest, FastAPI TestClient · Vitest, Testing Library |
 | Other     | `qrcode` (QR codes generated in the browser, no external service) |
 
-Planned for later phases: Redis with a background job queue, AI provider adapters
-(Gemini, OpenAI, Claude, DeepSeek, Groq, OpenRouter), OpenCV, Sentence Transformers,
-SymPy, Recharts and Docker Compose.
+Planned for later phases: Sentence Transformers and SymPy (verification, Phase 5),
+Recharts (analytics, Phase 6) and Docker Compose (Phase 7).
 
 ## Repository layout
 
@@ -91,6 +96,14 @@ Set `JWT_SECRET_KEY` to a random value (the API refuses to start with a weak sec
 python -c "import secrets; print(secrets.token_urlsafe(64))"
 ```
 
+Set `ENCRYPTION_KEYS` so teachers can store AI provider keys (AES-256-GCM, 32-byte key):
+
+```bash
+python -c "import os,base64; print('k1:' + base64.b64encode(os.urandom(32)).decode())"
+```
+
+To rotate, put the new key first and keep the old one after it (`k2:...,k1:...`).
+
 To use PostgreSQL, set for example
 `DATABASE_URL=postgresql+psycopg://gradepilot:password@localhost:5432/gradepilot`.
 
@@ -107,6 +120,16 @@ uvicorn app.main:app --reload --port 8000
 
 Interactive API documentation is served at <http://localhost:8000/api/docs>
 (disabled when `ENVIRONMENT=production`).
+
+Start the background worker in a second terminal (it reads and marks scripts):
+
+```bash
+celery -A app.tasks.celery_app worker --loglevel=info              # Linux / macOS
+celery -A app.tasks.celery_app worker --loglevel=info --pool=solo  # Windows
+```
+
+Without `CELERY_BROKER_URL` the worker uses a local SQLite broker; in production point it
+at Redis (`CELERY_BROKER_URL=redis://localhost:6379/0`).
 
 Create the first administrator (the password is prompted for, never passed as an argument):
 
@@ -202,6 +225,42 @@ The test suites need no external services and no API keys.
 - New submissions are stored with status **Received**. Text extraction and evaluation
   (Phase 4) will move them through the rest of the lifecycle.
 
+## AI integration (Phase 4)
+
+### Bring your own key
+Teachers connect only the providers they use under **AI Settings**. A key is tested with the
+provider before it is saved (a rejected key is never stored), encrypted with AES-256-GCM
+using associated data that binds it to its owner and provider, and only a masked hint such as
+`…abcd` is ever returned. Keys are decrypted only in the backend, for the duration of one
+request. A provider's free tier still needs an API key; a chat subscription does not include
+API usage. An OpenAI-compatible server at a custom URL (for example a local model server) can
+be enabled with `ALLOW_CUSTOM_AI_ENDPOINTS=true`; keep it off on shared servers.
+
+### Model slots
+- **A — OCR and documents:** reads scanned or photographed scripts and question papers.
+- **B — Evaluator:** marks answers against the rubric and drafts model answers and rubrics.
+- **C — Verifier:** configurable now; independent verification arrives in Phase 5.
+
+Model lists come live from each provider. **Check capabilities** sends two tiny requests (a
+JSON reply and a digit drawn in an image) to confirm text, JSON and image support.
+
+### Pipeline
+1. **Extraction.** Digital PDFs are read from their text layer and split with the local
+   parser. Scans and photos are rotated upright, contrast-enhanced with OpenCV and transcribed
+   by the OCR model a few pages at a time. Low confidence, unreadable parts or text that
+   matches no question send the submission to **teacher review** instead of being guessed.
+2. **Evaluation.** Each answer is marked against its approved rubric. The model must quote
+   evidence from the answer for every mark. The backend rejects unknown criteria and scores
+   outside 0..max (with one corrective retry), checks every quote against the answer, and
+   computes all totals itself. Missing answers score zero without an AI call; unreadable
+   answers and rejected output are left for the teacher, and no total is claimed then.
+3. **Status.** Students see plain-language status messages only. AI marks are suggestions
+   visible to the teacher; review, approval and release come in Phases 5 and 6.
+
+Student text is always passed to models as data, with an instruction to ignore any
+instructions it contains. Every request is logged with tokens, latency, outcome and cost
+when the provider reports it.
+
 ## API overview
 
 | Area | Endpoints |
@@ -219,6 +278,10 @@ The test suites need no external services and no API keys.
 | Answers and rubrics | `PUT/DELETE /api/questions/{id}/model-answer` · `PUT/DELETE /api/questions/{id}/rubric` |
 | Submissions | `POST /api/exams/{id}/submissions` · `GET /api/submissions` · `GET /api/submissions/{id}` · `GET /api/submissions/{id}/files/{file_id}` |
 | Student exams | `GET /api/student/exams` · `GET /api/student/exams/{slug}` |
+| AI settings | `GET /api/providers` · `POST /api/providers/connect` · `POST /api/providers/test` · `GET /api/providers/models` · `DELETE /api/providers/{id}` · `GET /api/model-configs` · `PUT/DELETE /api/model-configs/{slot}` · `POST /api/model-configs/{slot}/check` · `GET /api/usage` |
+| Processing | `POST /api/submissions/{id}/extract` · `POST /api/submissions/{id}/evaluate` · `POST /api/submissions/{id}/retry` · `POST /api/exams/{id}/process-pending` · `GET/PUT /api/submissions/{id}/extracted-answers` |
+| Evaluations | `GET /api/submissions/{id}/evaluation` · `GET /api/evaluations/{id}` |
+| AI drafting | `POST /api/exams/{id}/ocr-question-paper` · `POST /api/questions/{id}/model-answer/generate` · `POST /api/questions/{id}/rubric/suggest` |
 | Public | `GET /api/public/exams/{slug}` |
 | Health | `GET /api/health` |
 

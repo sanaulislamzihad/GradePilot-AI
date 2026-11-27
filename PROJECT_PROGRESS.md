@@ -9,7 +9,7 @@ A feature is marked done only when it is implemented, tested and working end to 
 | 1 | Foundation: setup, database, authentication, roles, dashboards | ✅ Done |
 | 2 | Exam management: creation, question paper, questions, marks, answers, rubrics, publishing | ✅ Done |
 | 3 | Student submission: exam access, script upload, attempts, submission records | ✅ Done |
-| 4 | AI integration | ⬜ |
+| 4 | AI integration: BYOK, provider adapters, router, extraction, evaluation, background jobs | ✅ Done |
 | 5 | Advanced evaluation | ⬜ |
 | 6 | Results and analytics | ⬜ |
 | 7 | Production readiness | ⬜ |
@@ -175,14 +175,58 @@ A feature is marked done only when it is implemented, tested and working end to 
   dashboard → submission preview → teacher submissions list and detail
 
 ### Deferred to later phases (by design)
-- Background job queue (Redis + worker) and processing of submissions start with Phase 4,
-  when there is extraction work to queue. New submissions stay **Received** until then.
+- Background processing was delivered in Phase 4.
 
-## Phase 4 — AI integration ⬜
-- ⬜ Provider adapters and central AI router
-- ⬜ BYOK settings with AES-256-GCM encrypted keys, masked display, connection test
-- ⬜ Model slots: OCR / evaluator / verifier
-- ⬜ Document extraction and rubric-based evaluation with feedback
+## Phase 4 — AI integration ✅
+
+### Keys and providers
+- ✅ AES-256-GCM encryption with key ids for rotation; associated data binds a key to its owner and provider
+- ✅ Keys tested before saving (rejected keys never stored), masked hints only, replace and delete, re-test
+- ✅ Adapters for Gemini, OpenAI, Anthropic Claude (official SDK), DeepSeek, Groq, OpenRouter,
+  plus an optional custom OpenAI-compatible endpoint (off by default)
+- ✅ Adapters never fall back to ambient server credentials; keys never appear in URLs or logs
+- ✅ Usage log per request (task, model, tokens, latency, outcome, cost when reported) with per-provider totals
+
+### Model slots and router
+- ✅ OCR, evaluator and verifier slots; same model allowed in several slots; live model lists
+- ✅ Capability check with real probes: listed by provider, text, JSON, image input, context window
+- ✅ Central router: per-request key decryption, retries with backoff for rate limits, timeouts
+  and outages, no retry for permanent errors, structured output validation with one corrective retry
+
+### Pipeline
+- ✅ Extraction from PDF text layers with the local parser; AI splitting only when labels are missing
+- ✅ OCR of scans and photos: EXIF rotation, grayscale, CLAHE contrast, resizing, batched pages
+- ✅ Label normalisation, continued answers joined, missing answers recorded
+- ✅ Teacher review when confidence is low, text is unreadable or does not match a question;
+  teacher corrections and confirmation before marking
+- ✅ Rubric-based evaluation per question with evidence, explanations, missing concepts and feedback
+- ✅ Backend score validation: criterion ids, 0..max bounds, evidence checked against the answer,
+  totals computed by the backend, no total when a question is ungraded
+- ✅ Prompt-injection guard: student text passed as data with instructions to ignore commands in it
+- ✅ Celery jobs (Redis in production, SQLite broker locally), automatic processing on upload,
+  compare-and-set status claims so no submission is processed twice, visible failures with retry
+- ✅ AI reading of scanned question papers; AI-drafted model answers and rubrics saved as unapproved drafts
+
+### Frontend
+- ✅ AI Settings page: provider keys, model slots, capability checks, usage
+- ✅ Submission processing panel with live status updates, extracted answer review, AI-suggested marks view
+- ✅ AI drafting buttons in exam setup, shown only when a suitable model is configured
+- ✅ Process all pending submissions of an exam
+
+### Tests
+- ✅ Backend: 156 tests in total — encryption, every adapter's request shape and error mapping,
+  BYOK API, router retries and validation, and the pipeline cases from the spec (correct, partial,
+  incorrect, alternative wording, missing, unreadable, out-of-scope) with a mock provider
+- ✅ Frontend: 33 tests in total — key entry, AI marks view, extraction review
+- ✅ Full flow in a real browser with a real Celery worker and a local OpenAI-compatible stub
+  model: connect a provider, configure and check slots, automatic processing of a digital
+  script and a photographed script, OCR review and confirmation, AI marks, student view without marks
+
+### Not done in this phase
+- Verifier slot is configurable, but independent verification runs from Phase 5.
+- Mathematical verification with SymPy and similarity signals from Sentence Transformers are Phase 5.
+- No real provider was called during development (no keys were available); adapters are tested
+  against recorded request and response shapes. Run **Check capabilities** after connecting a real key.
 
 ## Phase 5 — Advanced evaluation ⬜
 - ⬜ Independent verification, SymPy maths checks, review flags
