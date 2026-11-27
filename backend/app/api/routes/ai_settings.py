@@ -3,11 +3,11 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import Client, DbSession, TeacherUser
+from app.api.deps import Client, DbSession, TeacherUser, rate_limit_ai
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.models.ai import AIProvider, ModelConfig, ModelSlot, UsageLog, UserApiKey
@@ -64,7 +64,7 @@ def list_providers(teacher: TeacherUser, db: DbSession) -> list[ProviderRead]:
     ]
 
 
-@router.post("/providers/connect", response_model=ProviderRead)
+@router.post("/providers/connect", response_model=ProviderRead, dependencies=[Depends(rate_limit_ai)])
 def connect_provider(data: ConnectRequest, teacher: TeacherUser, db: DbSession, client: Client) -> ProviderRead:
     provider = ai_keys.get_provider(db, data.provider)
     key = ai_keys.save_key(db, teacher, provider, data.api_key, data.base_url)
@@ -75,7 +75,7 @@ def connect_provider(data: ConnectRequest, teacher: TeacherUser, db: DbSession, 
                         connection=_connection(key))
 
 
-@router.post("/providers/test", response_model=ProviderRead)
+@router.post("/providers/test", response_model=ProviderRead, dependencies=[Depends(rate_limit_ai)])
 def test_provider(data: ProviderSlugRequest, teacher: TeacherUser, db: DbSession) -> ProviderRead:
     ai_keys.require_encryption()
     key = ai_keys.key_for_provider(db, teacher, data.provider)
@@ -85,7 +85,7 @@ def test_provider(data: ProviderSlugRequest, teacher: TeacherUser, db: DbSession
                         requires_base_url=key.provider.slug == "custom", connection=_connection(key))
 
 
-@router.get("/providers/models", response_model=list[ModelInfoRead])
+@router.get("/providers/models", response_model=list[ModelInfoRead], dependencies=[Depends(rate_limit_ai)])
 def provider_models(provider: Annotated[str, Query(max_length=30)], teacher: TeacherUser, db: DbSession) -> list[ModelInfoRead]:
     ai_keys.require_encryption()
     key = ai_keys.key_for_provider(db, teacher, provider)
@@ -152,7 +152,7 @@ def clear_model_config(slot: ModelSlot, teacher: TeacherUser, db: DbSession) -> 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/model-configs/{slot}/check", response_model=ModelConfigRead)
+@router.post("/model-configs/{slot}/check", response_model=ModelConfigRead, dependencies=[Depends(rate_limit_ai)])
 def check_model_config(slot: ModelSlot, teacher: TeacherUser, db: DbSession) -> ModelConfigRead:
     ai_keys.require_encryption()
     config = next((c for c in _load_configs(db, teacher) if c.slot == slot.value), None)

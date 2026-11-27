@@ -2,3 +2,5 @@
 
 pytest>=8.3
 httpx>=0.27
+# Redis rate limiter tests run against an in-memory Redis (Lua scripting needs lupa).
+fakeredis[lua]>=2.26

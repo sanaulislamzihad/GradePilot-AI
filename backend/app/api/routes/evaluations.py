@@ -8,11 +8,11 @@ import uuid
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import Client, DbSession, TeacherUser
+from app.api.deps import Client, DbSession, TeacherUser, rate_limit_ai
 from app.core.errors import AppError
 from app.models.audit_log import AuditLog
 from app.models.evaluation import (
@@ -78,7 +78,7 @@ def _record(db, teacher, action: str, submission: Submission, client) -> None:
 
 # --- Processing actions ----------------------------------------------------
 
-@router.post("/submissions/{submission_id}/extract", response_model=SubmissionDetail)
+@router.post("/submissions/{submission_id}/extract", response_model=SubmissionDetail, dependencies=[Depends(rate_limit_ai)])
 def extract_submission(submission_id: uuid.UUID, teacher: TeacherUser, db: DbSession, client: Client) -> SubmissionDetail:
     """Read the script and split it by question; marking follows automatically when nothing needs review."""
     submission = _owned_submission(db, teacher, submission_id)
@@ -87,7 +87,7 @@ def extract_submission(submission_id: uuid.UUID, teacher: TeacherUser, db: DbSes
     return _detail(db, teacher, submission_id)
 
 
-@router.post("/submissions/{submission_id}/retry", response_model=SubmissionDetail)
+@router.post("/submissions/{submission_id}/retry", response_model=SubmissionDetail, dependencies=[Depends(rate_limit_ai)])
 def retry_submission(submission_id: uuid.UUID, teacher: TeacherUser, db: DbSession, client: Client) -> SubmissionDetail:
     submission = _owned_submission(db, teacher, submission_id)
     if submission.status != S.FAILED.value:
@@ -97,7 +97,7 @@ def retry_submission(submission_id: uuid.UUID, teacher: TeacherUser, db: DbSessi
     return _detail(db, teacher, submission_id)
 
 
-@router.post("/submissions/{submission_id}/evaluate", response_model=SubmissionDetail)
+@router.post("/submissions/{submission_id}/evaluate", response_model=SubmissionDetail, dependencies=[Depends(rate_limit_ai)])
 def evaluate_submission(submission_id: uuid.UUID, teacher: TeacherUser, db: DbSession, client: Client) -> SubmissionDetail:
     """Mark the already-extracted answers again (for example after correcting them)."""
     submission = _owned_submission(db, teacher, submission_id)
@@ -106,7 +106,7 @@ def evaluate_submission(submission_id: uuid.UUID, teacher: TeacherUser, db: DbSe
     return _detail(db, teacher, submission_id)
 
 
-@router.post("/exams/{exam_id}/process-pending", response_model=ProcessPendingResult)
+@router.post("/exams/{exam_id}/process-pending", response_model=ProcessPendingResult, dependencies=[Depends(rate_limit_ai)])
 def process_pending(exam_id: uuid.UUID, teacher: TeacherUser, db: DbSession) -> ProcessPendingResult:
     """Queue every current submission of an exam that has not been processed or has failed."""
     exam = get_owned_exam(db, teacher, exam_id)
@@ -374,7 +374,7 @@ def reopen_evaluation(evaluation_id: uuid.UUID, teacher: TeacherUser, db: DbSess
     return _evaluation_read(db, _owned_evaluation(db, teacher, evaluation_id)[0])
 
 
-@router.post("/evaluations/{evaluation_id}/reject", response_model=SubmissionDetail)
+@router.post("/evaluations/{evaluation_id}/reject", response_model=SubmissionDetail, dependencies=[Depends(rate_limit_ai)])
 def reject_evaluation(
     evaluation_id: uuid.UUID, data: RejectRequest, teacher: TeacherUser, db: DbSession, client: Client
 ) -> SubmissionDetail:
@@ -396,7 +396,7 @@ def reject_evaluation(
     return _detail(db, teacher, submission.id)
 
 
-@router.post("/evaluations/{evaluation_id}/verify", response_model=SubmissionDetail)
+@router.post("/evaluations/{evaluation_id}/verify", response_model=SubmissionDetail, dependencies=[Depends(rate_limit_ai)])
 def verify_evaluation(evaluation_id: uuid.UUID, teacher: TeacherUser, db: DbSession) -> SubmissionDetail:
     """Run the independent checks again, for example after setting up a verifier model."""
     evaluation, submission = _owned_evaluation(db, teacher, evaluation_id)

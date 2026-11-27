@@ -4,9 +4,9 @@ unapproved draft for the teacher to review; nothing is approved automatically.""
 import uuid
 from decimal import Decimal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.api.deps import Client, DbSession, TeacherUser
+from app.api.deps import Client, DbSession, TeacherUser, rate_limit_ai
 from app.core.errors import AppError
 from app.database.base import utcnow
 from app.models.ai import ModelSlot
@@ -38,7 +38,7 @@ def _ai_failure(exc: AIError) -> AppError:
     return AppError(409 if exc.code == "not_configured" else 502, exc.message)
 
 
-@router.post("/exams/{exam_id}/ocr-question-paper", response_model=ExamDetail)
+@router.post("/exams/{exam_id}/ocr-question-paper", response_model=ExamDetail, dependencies=[Depends(rate_limit_ai)])
 def read_paper_with_ai(exam_id: uuid.UUID, teacher: TeacherUser, db: DbSession, client: Client) -> ExamDetail:
     """Transcribe a scanned or photographed question paper with the OCR model."""
     exam = svc.get_owned_exam(db, teacher, exam_id, full=True)
@@ -92,7 +92,7 @@ def _full_question_text(question) -> str:
     return question.text
 
 
-@router.post("/questions/{question_id}/model-answer/generate", response_model=ExamDetail)
+@router.post("/questions/{question_id}/model-answer/generate", response_model=ExamDetail, dependencies=[Depends(rate_limit_ai)])
 def draft_model_answer(question_id: uuid.UUID, teacher: TeacherUser, db: DbSession, client: Client) -> ExamDetail:
     question = _leaf(db, teacher, question_id)
     if not question.text.strip():
@@ -122,7 +122,7 @@ def draft_model_answer(question_id: uuid.UUID, teacher: TeacherUser, db: DbSessi
     return svc.detail(db, question.exam_id)
 
 
-@router.post("/questions/{question_id}/rubric/suggest", response_model=ExamDetail)
+@router.post("/questions/{question_id}/rubric/suggest", response_model=ExamDetail, dependencies=[Depends(rate_limit_ai)])
 def suggest_rubric(question_id: uuid.UUID, teacher: TeacherUser, db: DbSession, client: Client) -> ExamDetail:
     question = _leaf(db, teacher, question_id)
     if question.marks is None:

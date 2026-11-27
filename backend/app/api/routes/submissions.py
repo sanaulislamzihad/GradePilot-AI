@@ -8,12 +8,12 @@ existence of a submission is never revealed.
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, File, Header, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Header, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import Client, CurrentUser, DbSession, StudentUser
+from app.api.deps import Client, CurrentUser, DbSession, StudentUser, rate_limit_upload
 from app.core.errors import AppError
 from app.models.exam import Exam, ExamStatus
 from app.models.submission import Submission, SubmissionStatus
@@ -46,7 +46,7 @@ def _visible_submission(db: Session, user: User, submission_id: uuid.UUID) -> Su
     return submission
 
 
-@router.post("/exams/{exam_id}/submissions", response_model=SubmissionDetail, status_code=status.HTTP_201_CREATED)
+@router.post("/exams/{exam_id}/submissions", response_model=SubmissionDetail, status_code=status.HTTP_201_CREATED, dependencies=[Depends(rate_limit_upload)])
 async def submit_script(
     exam_id: uuid.UUID,
     response: Response,
