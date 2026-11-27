@@ -1,4 +1,6 @@
-import { Inbox, Search } from 'lucide-react'
+import { Inbox, Play, Search } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/Button'
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { SubmissionStatusBadge } from '@/components/SubmissionStatusBadge'
@@ -10,7 +12,8 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/States'
 import { TBody, TD, TH, THead, TR, Table } from '@/components/ui/Table'
 import { useAsync } from '@/hooks/useAsync'
 import { useDebounced } from '@/hooks/useDebounced'
-import { examApi, submissionApi } from '@/services/api'
+import { examApi, processingApi, submissionApi } from '@/services/api'
+import { errorMessage } from '@/services/http'
 import type { SubmissionStatus } from '@/types/api'
 import { formatDateTime } from '@/utils/format'
 import { submissionStatusLabel } from '@/utils/submissionStatus'
@@ -60,10 +63,38 @@ export default function SubmissionsPage() {
     setPage(1)
   }
   const filtered = Boolean(examId || status || debouncedQuery)
+  const [processing, setProcessing] = useState(false)
+
+  const processPending = async () => {
+    setProcessing(true)
+    try {
+      const result = await processingApi.processPending(examId)
+      toast.success(
+        result.queued
+          ? `Processing ${result.queued} submission${result.queued === 1 ? '' : 's'}`
+          : 'No submissions are waiting to be processed',
+      )
+      reload()
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setProcessing(false)
+    }
+  }
 
   return (
     <>
-      <PageHeader title="Submissions" description="Each student's current answer script for your published exams." />
+      <PageHeader
+        title="Submissions"
+        description="Each student's current answer script for your published exams."
+        actions={
+          examId && (
+            <Button variant="secondary" onClick={processPending} loading={processing}>
+              <Play /> Process pending
+            </Button>
+          )
+        }
+      />
       <Card>
         <div className="flex flex-col gap-2 border-b border-zinc-200 p-3 lg:flex-row">
           <Select value={examId} onChange={(e) => setFilter('exam', e.target.value)} aria-label="Filter by exam" className="lg:w-72">

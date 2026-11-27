@@ -5,20 +5,61 @@ import { SubmissionStatusBadge } from '@/components/SubmissionStatusBadge'
 import { Card, CardHeader } from '@/components/ui/Card'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { ErrorState, LoadingState } from '@/components/ui/States'
+import { useAiSlots } from '@/hooks/useAiSlots'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
-import { submissionApi } from '@/services/api'
+import { usePolling } from '@/hooks/usePolling'
+import { EvaluationView } from '@/pages/teacher/submission/EvaluationView'
+import { ExtractionEditor } from '@/pages/teacher/submission/ExtractionEditor'
+import { ProcessingPanel } from '@/pages/teacher/submission/ProcessingPanel'
+import { processingApi, submissionApi } from '@/services/api'
+import type { SubmissionDetail } from '@/types/api'
 import { formatBytes, formatDateTime } from '@/utils/format'
+import { IN_PROGRESS_STATUSES } from '@/utils/submissionStatus'
+
+const AFTER_EXTRACTION = ['ocr_review_required', 'ready_for_evaluation', 'evaluating', 'teacher_review_required', 'failed', 'approved', 'published']
+
+function TeacherProcessing({ submission, onUpdated }: { submission: SubmissionDetail; onUpdated: (s: SubmissionDetail) => void }) {
+  const slots = useAiSlots()
+  const showExtraction = AFTER_EXTRACTION.includes(submission.status)
+  const extraction = useAsync(
+    () => (showExtraction ? processingApi.extractedAnswers(submission.id) : Promise.resolve(null)),
+    `extraction:${submission.id}:${submission.status}`,
+  )
+  const evaluation = useAsync(
+    () => processingApi.evaluation(submission.id).catch(() => null),
+    `evaluation:${submission.id}:${submission.status}`,
+  )
+
+  return (
+    <>
+      <ProcessingPanel submission={submission} hasEvaluator={slots.has('evaluator')} onUpdated={onUpdated} />
+      {extraction.data && extraction.data.answers.length > 0 && (
+        <ExtractionEditor
+          key={`${submission.status}:${extraction.data.answers.map((a) => a.source + a.text.length).join()}`}
+          submissionId={submission.id}
+          view={extraction.data}
+          onSaved={async (view, confirmed) => {
+            extraction.setData(() => view)
+            if (confirmed) onUpdated(await processingApi.evaluate(submission.id))
+          }}
+        />
+      )}
+      {evaluation.data && <EvaluationView evaluation={evaluation.data} />}
+    </>
+  )
+}
 
 /** One submission, for its student or for the teacher who owns the exam. */
 export default function SubmissionDetailPage() {
   const { submissionId = '' } = useParams()
   const { user } = useAuth()
   const isTeacher = user?.role === 'teacher'
-  const { data: submission, error, loading, reload } = useAsync(
+  const { data: submission, error, loading, reload, setData } = useAsync(
     () => submissionApi.get(submissionId),
     `submission:${submissionId}`,
   )
+  usePolling(Boolean(submission && IN_PROGRESS_STATUSES.includes(submission.status)), reload)
 
   if (loading && (!submission || submission.id !== submissionId)) return <LoadingState />
   if (error || !submission) return <ErrorState message={error ?? 'Submission not found'} onRetry={reload} />
@@ -56,13 +97,16 @@ export default function SubmissionDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {isTeacher && submission.is_latest && (
+            <TeacherProcessing submission={submission} onUpdated={(updated) => setData(() => updated)} />
+          )}
           <Card>
             <CardHeader title="Answer script" description="Files are private to the student and the exam's teacher." />
             <SubmissionFiles submission={submission} />
           </Card>
-          {submission.status_message && (
+          {!isTeacher && submission.status_message && (
             <Card>
-              <CardHeader title="Processing" />
+              <CardHeader title="Status" />
               <p className="px-5 py-4 text-sm text-zinc-700">{submission.status_message}</p>
             </Card>
           )}
