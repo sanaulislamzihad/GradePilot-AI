@@ -2,8 +2,9 @@
 
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.api.routes import (
@@ -39,6 +40,34 @@ def create_app() -> FastAPI:
         openapi_url=None if settings.environment == "production" else "/api/openapi.json",
     )
 
+    max_body = settings.max_request_size_mb * 1024 * 1024
+    production = settings.environment == "production"
+    docs_paths = ("/api/docs", "/api/openapi.json")
+
+    @app.middleware("http")
+    async def _request_limits_and_headers(request: Request, call_next):
+        # Reject oversized bodies before reading them (the proxy enforces the same limit
+        # for requests without a Content-Length header).
+        length = request.headers.get("content-length")
+        if length and length.isdigit() and int(length) > max_body:
+            return JSONResponse(
+                {"detail": f"The request is too large. The limit is {settings.max_request_size_mb} MB."},
+                status_code=413,
+            )
+        response = await call_next(request)
+        headers = response.headers
+        headers.setdefault("X-Content-Type-Options", "nosniff")
+        headers.setdefault("X-Frame-Options", "DENY")
+        headers.setdefault("Referrer-Policy", "no-referrer")
+        headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        if not request.url.path.startswith(docs_paths):
+            # The API only returns data and files, never pages that run scripts.
+            headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+        if production:
+            headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        return response
+
+    # Added last so it is the outermost layer: error responses (413, 429) keep their CORS headers.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -46,14 +75,6 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
     )
-
-    @app.middleware("http")
-    async def _security_headers(request, call_next):
-        response = await call_next(request)
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "DENY")
-        response.headers.setdefault("Referrer-Policy", "no-referrer")
-        return response
 
     register_exception_handlers(app)
 
