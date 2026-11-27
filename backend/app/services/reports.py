@@ -65,7 +65,13 @@ def _render(body: str) -> bytes:
         story.draw(device)
         writer.end_page()
     writer.close()
-    return buffer.getvalue()
+    # Keep only the glyphs actually used; the embedded font is otherwise ~1 MB.
+    document = pymupdf.open(stream=buffer.getvalue(), filetype="pdf")
+    try:
+        document.subset_fonts()
+    except Exception:  # noqa: BLE001 - subsetting is an optimisation only
+        pass
+    return document.tobytes(garbage=3, deflate=True)
 
 
 def result_pdf(view: ResultView) -> bytes:
