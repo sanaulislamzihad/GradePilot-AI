@@ -21,6 +21,7 @@ vi.mock('@/services/api', () => ({
   studentApi: { enrollments: vi.fn().mockResolvedValue([]) },
   adminApi: {},
   profileApi: {},
+  resultsApi: { mine: vi.fn().mockResolvedValue([]) },
 }))
 
 const teacherDashboard = {
@@ -89,7 +90,7 @@ describe('teacher dashboard', () => {
 
     const nav = screen.getAllByRole('navigation', { name: 'Main' })[0]!
     const links = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)
-    expect(links).toEqual(['Dashboard', 'My Exams', 'Create Exam', 'Submissions', 'AI Evaluation', 'Courses', 'AI Settings', 'Profile'])
+    expect(links).toEqual(['Dashboard', 'My Exams', 'Create Exam', 'Submissions', 'AI Evaluation', 'Results', 'Analytics', 'Courses', 'AI Settings', 'Profile'])
   })
 })
 

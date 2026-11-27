@@ -26,6 +26,10 @@ const SubmissionDetailPage = lazy(() => import('@/pages/shared/SubmissionDetailP
 const SubmissionsPage = lazy(() => import('@/pages/teacher/SubmissionsPage'))
 const AISettingsPage = lazy(() => import('@/pages/teacher/ai/AISettingsPage'))
 const EvaluationQueuePage = lazy(() => import('@/pages/teacher/EvaluationQueuePage'))
+const ResultsPage = lazy(() => import('@/pages/teacher/results/ResultsPage'))
+const AnalyticsPage = lazy(() => import('@/pages/teacher/results/AnalyticsPage'))
+const ResultDetailPage = lazy(() => import('@/pages/shared/ResultDetailPage'))
+const MyResultsPage = lazy(() => import('@/pages/student/results/MyResultsPage'))
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'))
 const UsersPage = lazy(() => import('@/pages/admin/UsersPage'))
 const AuditLogPage = lazy(() => import('@/pages/admin/AuditLogPage'))
@@ -55,6 +59,9 @@ export default function App() {
             <Route path="submissions/:submissionId" element={<SubmissionDetailPage />} />
             <Route path="ai-settings" element={<AISettingsPage />} />
             <Route path="evaluation" element={<EvaluationQueuePage />} />
+            <Route path="results" element={<ResultsPage />} />
+            <Route path="results/:submissionId" element={<ResultDetailPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="profile" element={<ProfilePage />} />
           </Route>
         </Route>
@@ -67,6 +74,8 @@ export default function App() {
             <Route path="exams/:slug" element={<StudentExamPage />} />
             <Route path="submissions" element={<MySubmissionsPage />} />
             <Route path="submissions/:submissionId" element={<SubmissionDetailPage />} />
+            <Route path="results" element={<MyResultsPage />} />
+            <Route path="results/:submissionId" element={<ResultDetailPage />} />
             <Route path="profile" element={<ProfilePage />} />
           </Route>
         </Route>

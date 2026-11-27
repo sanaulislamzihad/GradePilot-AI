@@ -1,4 +1,6 @@
 import {
+  Award,
+  BarChart3,
   BookOpen,
   Bot,
   ClipboardCheck,
@@ -26,9 +28,7 @@ export interface NavItem {
 }
 
 /**
- * Only implemented pages appear here. Modules from later phases (results,
- * analytics) are added to this list when they ship, so no menu entry ever
- * leads to a placeholder.
+ * Only implemented pages appear here, so no menu entry ever leads to a placeholder.
  */
 export const navigation: Record<UserRole, NavItem[]> = {
   teacher: [
@@ -37,6 +37,8 @@ export const navigation: Record<UserRole, NavItem[]> = {
     { label: 'Create Exam', to: '/teacher/exams/new', icon: FilePlus2 },
     { label: 'Submissions', to: '/teacher/submissions', icon: Inbox },
     { label: 'AI Evaluation', to: '/teacher/evaluation', icon: ClipboardCheck },
+    { label: 'Results', to: '/teacher/results', icon: Award },
+    { label: 'Analytics', to: '/teacher/analytics', icon: BarChart3 },
     { label: 'Courses', to: '/teacher/courses', icon: BookOpen },
     { label: 'AI Settings', to: '/teacher/ai-settings', icon: Bot },
     { label: 'Profile', to: '/teacher/profile', icon: UserCircle },
@@ -45,6 +47,7 @@ export const navigation: Record<UserRole, NavItem[]> = {
     { label: 'Dashboard', to: '/student', icon: LayoutDashboard, end: true },
     { label: 'Available Exams', to: '/student/exams', icon: ClipboardList },
     { label: 'My Submissions', to: '/student/submissions', icon: Inbox },
+    { label: 'My Results', to: '/student/results', icon: Award },
     { label: 'My Courses', to: '/student/courses', icon: GraduationCap },
     { label: 'Profile', to: '/student/profile', icon: UserCircle },
   ],
