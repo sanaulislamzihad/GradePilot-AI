@@ -107,7 +107,7 @@ class QuestionStat(BaseModel):
 
 class ConceptCount(BaseModel):
     concept: str
-    count: int
+    count: int  # number of students whose answers missed it
 
 
 class ExamAnalytics(BaseModel):
@@ -116,7 +116,7 @@ class ExamAnalytics(BaseModel):
     total_marks: float
     total_students: int
     total_submissions: int
-    pending_evaluations: int
+    pending_evaluations: int  # latest submissions without approved marks yet
     approved_results: int
     published_results: int
     # Statistics use teacher-approved marks only (approved or published).

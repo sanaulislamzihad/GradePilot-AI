@@ -76,6 +76,7 @@ def compute(db: Session, exam: Exam) -> ExamAnalytics:
     concepts: Counter[str] = Counter()
     display: dict[str, str] = {}
     for _, evaluation in graded:
+        missing: set[str] = set()  # each student counts once per concept
         for row in evaluation.questions:
             final = review.question_final(row)
             stat = per_question.setdefault(row.question_id, {"sum": Decimal("0"), "n": 0, "answered": 0})
@@ -86,8 +87,9 @@ def compute(db: Session, exam: Exam) -> ExamAnalytics:
             for concept in [*row.missing_concepts, *[m for c in row.criteria for m in c.missing_concepts]]:
                 key = _concept_key(concept)
                 if key:
-                    concepts[key] += 1
+                    missing.add(key)
                     display.setdefault(key, concept.strip().rstrip("."))
+        concepts.update(missing)
 
     questions = []
     for question, label in leaves(exam):

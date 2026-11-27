@@ -181,7 +181,9 @@ def test_csv_export_neutralises_formulas(client, teacher, ai, make_client):
 
 def test_analytics_use_approved_marks_only(client, teacher, ai, make_client):
     exam = setup(client, teacher)
-    strong = {"1": [score(5, ["learn patterns from data"])], "2(a)": [score(4, ["uses labelled examples"])]}
+    # GRADES lists "a concrete example" twice for one student; this student misses it once, spelled differently.
+    strong = {"1": [{**score(5, ["learn patterns from data"]), "missing_concepts": ["A concrete example."]}],
+              "2(a)": [score(4, ["uses labelled examples"])]}
     for grades in (GRADES, strong):
         s = register(make_client(), "student")
         _, evaluation = mark(client, teacher, s, ai, exam, grades)
