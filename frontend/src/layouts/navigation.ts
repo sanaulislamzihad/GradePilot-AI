@@ -1,6 +1,7 @@
 import {
   BookOpen,
   Bot,
+  ClipboardCheck,
   ClipboardList,
   FilePlus2,
   FileText,
@@ -35,6 +36,7 @@ export const navigation: Record<UserRole, NavItem[]> = {
     { label: 'My Exams', to: '/teacher/exams', icon: FileText, matchExclude: '/teacher/exams/new' },
     { label: 'Create Exam', to: '/teacher/exams/new', icon: FilePlus2 },
     { label: 'Submissions', to: '/teacher/submissions', icon: Inbox },
+    { label: 'AI Evaluation', to: '/teacher/evaluation', icon: ClipboardCheck },
     { label: 'Courses', to: '/teacher/courses', icon: BookOpen },
     { label: 'AI Settings', to: '/teacher/ai-settings', icon: Bot },
     { label: 'Profile', to: '/teacher/profile', icon: UserCircle },

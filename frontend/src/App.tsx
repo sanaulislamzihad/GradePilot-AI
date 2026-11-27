@@ -25,6 +25,7 @@ const MySubmissionsPage = lazy(() => import('@/pages/student/MySubmissionsPage')
 const SubmissionDetailPage = lazy(() => import('@/pages/shared/SubmissionDetailPage'))
 const SubmissionsPage = lazy(() => import('@/pages/teacher/SubmissionsPage'))
 const AISettingsPage = lazy(() => import('@/pages/teacher/ai/AISettingsPage'))
+const EvaluationQueuePage = lazy(() => import('@/pages/teacher/EvaluationQueuePage'))
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'))
 const UsersPage = lazy(() => import('@/pages/admin/UsersPage'))
 const AuditLogPage = lazy(() => import('@/pages/admin/AuditLogPage'))
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="submissions" element={<SubmissionsPage />} />
             <Route path="submissions/:submissionId" element={<SubmissionDetailPage />} />
             <Route path="ai-settings" element={<AISettingsPage />} />
+            <Route path="evaluation" element={<EvaluationQueuePage />} />
             <Route path="profile" element={<ProfilePage />} />
           </Route>
         </Route>
