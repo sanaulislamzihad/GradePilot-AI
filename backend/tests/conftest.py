@@ -2,6 +2,7 @@
 
 Environment variables are set before the app is imported, so the engine and
 settings point at a throwaway SQLite database created through Alembic.
+Set TEST_DATABASE_URL to run the same suite against an empty PostgreSQL database.
 """
 
 import os
@@ -13,7 +14,7 @@ _TMP = Path(tempfile.mkdtemp(prefix="gradepilot-tests-"))
 os.environ.update(
     {
         "ENVIRONMENT": "test",
-        "DATABASE_URL": f"sqlite:///{(_TMP / 'test.db').as_posix()}",
+        "DATABASE_URL": os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{(_TMP / 'test.db').as_posix()}",
         "JWT_SECRET_KEY": "test-secret-key-that-is-long-enough-for-hs256-signing",
         "STORAGE_DIR": str(_TMP / "storage"),
         "AUTH_RATE_LIMIT_ATTEMPTS": "10",

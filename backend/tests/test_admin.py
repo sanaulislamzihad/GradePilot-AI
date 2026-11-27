@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.database.session import engine
 from tests.conftest import PASSWORD, auth, register
 
 
@@ -59,7 +60,7 @@ def test_audit_log_records_actions_without_secrets(client: TestClient, admin, te
 def test_system_status_reports_health(client: TestClient, admin):
     status = client.get("/api/admin/system", headers=auth(admin)).json()
     assert status["database_ok"] is True
-    assert status["database_backend"] == "sqlite"
+    assert status["database_backend"] == engine.dialect.name
     assert status["migration_revision"]
     assert status["storage_writable"] is True
     assert status["active_sessions"] >= 1
