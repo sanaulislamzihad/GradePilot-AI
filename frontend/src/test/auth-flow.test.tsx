@@ -89,7 +89,7 @@ describe('teacher dashboard', () => {
 
     const nav = screen.getAllByRole('navigation', { name: 'Main' })[0]!
     const links = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)
-    expect(links).toEqual(['Dashboard', 'My Exams', 'Create Exam', 'Submissions', 'Courses', 'Profile'])
+    expect(links).toEqual(['Dashboard', 'My Exams', 'Create Exam', 'Submissions', 'Courses', 'AI Settings', 'Profile'])
   })
 })
 

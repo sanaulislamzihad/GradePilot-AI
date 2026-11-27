@@ -13,6 +13,7 @@ import { formatMarks, fromLocalInput, hasTwoDecimalsAtMost, toLocalInput } from 
 
 vi.mock('@/services/api', () => ({
   examApi: { saveMarks: vi.fn(), saveRubric: vi.fn(), publish: vi.fn() },
+  aiApi: { modelConfigs: vi.fn().mockResolvedValue([]) },
 }))
 
 function question(overrides: Partial<Question>): Question {

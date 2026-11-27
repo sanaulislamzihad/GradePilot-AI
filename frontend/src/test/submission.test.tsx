@@ -103,6 +103,8 @@ const receipt: SubmissionDetail = {
   max_attempts: 2,
   submission_deadline: '2030-06-30T17:59:00Z',
   files: [],
+  processing_error: null,
+  extraction_notes: null,
 }
 
 function renderExamPage() {
