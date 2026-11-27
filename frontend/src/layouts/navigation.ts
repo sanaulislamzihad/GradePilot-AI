@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  Bot,
   ClipboardList,
   FilePlus2,
   FileText,
@@ -24,9 +25,9 @@ export interface NavItem {
 }
 
 /**
- * Only implemented pages appear here. Modules from later phases (AI evaluation,
- * results, analytics, AI settings) are added to this list when they ship, so no
- * menu entry ever leads to a placeholder.
+ * Only implemented pages appear here. Modules from later phases (results,
+ * analytics) are added to this list when they ship, so no menu entry ever
+ * leads to a placeholder.
  */
 export const navigation: Record<UserRole, NavItem[]> = {
   teacher: [
@@ -35,6 +36,7 @@ export const navigation: Record<UserRole, NavItem[]> = {
     { label: 'Create Exam', to: '/teacher/exams/new', icon: FilePlus2 },
     { label: 'Submissions', to: '/teacher/submissions', icon: Inbox },
     { label: 'Courses', to: '/teacher/courses', icon: BookOpen },
+    { label: 'AI Settings', to: '/teacher/ai-settings', icon: Bot },
     { label: 'Profile', to: '/teacher/profile', icon: UserCircle },
   ],
   student: [

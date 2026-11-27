@@ -1,11 +1,12 @@
-import { ScanText } from 'lucide-react'
+import { Bot, ScanText } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { FileUpload } from '@/components/FileUpload'
 import { Button } from '@/components/ui/Button'
 import { CardBody } from '@/components/ui/Card'
 import { ConfirmDialog } from '@/components/ui/Dialog'
+import { useAiSlots } from '@/hooks/useAiSlots'
 import { examApi } from '@/services/api'
 import { errorMessage } from '@/services/http'
 import { leafQuestions, useExamWorkspace } from '../workspace'
@@ -22,7 +23,21 @@ export function PaperStep() {
   const [extracting, setExtracting] = useState(false)
   const [confirmReplace, setConfirmReplace] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState(false)
+  const [reading, setReading] = useState(false)
+  const slots = useAiSlots()
   const paper = exam.documents.find((d) => d.kind === 'question_paper')
+
+  const readWithAi = async () => {
+    setReading(true)
+    try {
+      setExam(await examApi.readPaperWithAi(exam.id))
+      toast.success('The paper was read. Check the text, then extract the questions.')
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setReading(false)
+    }
+  }
 
   const onFile = async (file: File) => {
     setUploading(true)
@@ -68,6 +83,27 @@ export function PaperStep() {
             busy={uploading}
             hint={paper ? 'Upload a new file to replace the current paper' : undefined}
           />
+        )}
+
+        {paper?.extraction_status === 'needs_ocr' && editable && (
+          <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-zinc-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+            {slots.has('ocr') ? (
+              <>
+                <p className="text-sm text-zinc-700">Read this scanned paper with your OCR model, then check the text.</p>
+                <Button onClick={readWithAi} loading={reading}>
+                  <Bot /> Read with AI
+                </Button>
+              </>
+            ) : (
+              <p className="text-sm text-zinc-700">
+                To read scanned papers automatically, set up an OCR model in{' '}
+                <Link to="/teacher/ai-settings" className="font-medium text-zinc-900 underline underline-offset-4">
+                  AI Settings
+                </Link>
+                . You can also add the questions by hand.
+              </p>
+            )}
+          </div>
         )}
 
         {paper?.extraction_status === 'succeeded' && editable && (

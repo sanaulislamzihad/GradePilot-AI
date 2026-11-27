@@ -1,10 +1,11 @@
-import { ListChecks, Plus, X } from 'lucide-react'
+import { Bot, ListChecks, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { StatusBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { EmptyState } from '@/components/ui/States'
+import { useAiSlots } from '@/hooks/useAiSlots'
 import { examApi } from '@/services/api'
 import { errorMessage } from '@/services/http'
 import type { Question } from '@/types/api'
@@ -23,13 +24,13 @@ interface Row {
 let rowKey = 0
 const newRow = (partial: Partial<Row> = {}): Row => ({ key: ++rowKey, name: '', description: '', marks: '', ...partial })
 
-function RubricEditor({ question }: { question: Question }) {
+function RubricEditor({ question, canSuggest }: { question: Question; canSuggest: boolean }) {
   const { setExam, editable } = useExamWorkspace()
   const initial = question.rubric?.criteria.length
     ? question.rubric.criteria.map((c) => newRow({ name: c.name, description: c.description ?? '', marks: String(c.max_marks) }))
     : [newRow()]
   const [rows, setRows] = useState<Row[]>(initial)
-  const [busy, setBusy] = useState<'draft' | 'approve' | null>(null)
+  const [busy, setBusy] = useState<'draft' | 'approve' | 'ai' | null>(null)
   const [dirty, setDirty] = useState(false)
 
   const update = (key: number, patch: Partial<Row>) => {
@@ -44,6 +45,18 @@ function RubricEditor({ question }: { question: Question }) {
   const total = Math.round(parsed.reduce((s, r) => s + (r.value > 0 ? r.value : 0), 0) * 100) / 100
   const matches = question.marks !== null && total === question.marks
   const approved = question.rubric?.is_approved ?? false
+
+  const suggest = async () => {
+    setBusy('ai')
+    try {
+      setExam(await examApi.suggestRubric(question.id))
+      toast.success(`AI rubric draft ready for ${question.full_label}. Review it before approving.`)
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(null)
+    }
+  }
 
   const save = async (approve: boolean) => {
     setBusy(approve ? 'approve' : 'draft')
@@ -122,7 +135,12 @@ function RubricEditor({ question }: { question: Question }) {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {editable && canSuggest && !approved && !dirty && question.marks !== null && (
+            <Button variant="ghost" size="sm" onClick={suggest} loading={busy === 'ai'}>
+              <Bot /> Suggest with AI
+            </Button>
+          )}
           {editable && (
             <Button
               variant="ghost"
@@ -168,6 +186,7 @@ function RubricEditor({ question }: { question: Question }) {
 
 export function RubricsStep() {
   const { exam } = useExamWorkspace()
+  const slots = useAiSlots()
   const leaves = leafQuestions(exam)
   const approvedCount = leaves.filter((q) => q.rubric?.is_approved && q.rubric.total === q.marks).length
 
@@ -182,7 +201,11 @@ export function RubricsStep() {
       ) : (
         <div className="divide-y divide-zinc-100">
           {leaves.map((question) => (
-            <RubricEditor key={`${question.id}:${question.rubric?.approved_at ?? ''}:${question.rubric?.total ?? ''}:${question.marks}`} question={question} />
+            <RubricEditor
+              key={`${question.id}:${question.rubric?.approved_at ?? ''}:${question.rubric?.criteria.map((c) => c.id).join() ?? ''}:${question.marks}`}
+              question={question}
+              canSuggest={slots.has('evaluator')}
+            />
           ))}
         </div>
       )}

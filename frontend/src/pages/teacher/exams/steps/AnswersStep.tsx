@@ -1,4 +1,4 @@
-import { BookOpenCheck } from 'lucide-react'
+import { BookOpenCheck, Bot } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { FileUpload } from '@/components/FileUpload'
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { CardBody } from '@/components/ui/Card'
 import { Textarea } from '@/components/ui/Input'
 import { EmptyState } from '@/components/ui/States'
+import { useAiSlots } from '@/hooks/useAiSlots'
 import { examApi } from '@/services/api'
 import { errorMessage } from '@/services/http'
 import type { ModelAnswerUploadResult, Question } from '@/types/api'
@@ -19,14 +20,15 @@ function AnswerStatus({ question }: { question: Question }) {
   const answer = question.model_answer
   if (!answer) return <StatusBadge tone="negative">Missing</StatusBadge>
   if (answer.is_approved) return <StatusBadge tone="positive">Approved</StatusBadge>
-  return <StatusBadge tone="warning">{answer.source === 'uploaded' ? 'Imported, needs review' : 'Draft'}</StatusBadge>
+  const label = { uploaded: 'Imported, needs review', ai_generated: 'AI draft, needs review', manual: 'Draft' }[answer.source]
+  return <StatusBadge tone="warning">{label}</StatusBadge>
 }
 
-function AnswerEditor({ question }: { question: Question }) {
+function AnswerEditor({ question, canDraft }: { question: Question; canDraft: boolean }) {
   const { setExam, editable } = useExamWorkspace()
   const saved = question.model_answer?.content ?? ''
   const [content, setContent] = useState(saved)
-  const [busy, setBusy] = useState<'draft' | 'approve' | 'remove' | null>(null)
+  const [busy, setBusy] = useState<'draft' | 'approve' | 'remove' | 'ai' | null>(null)
   const dirty = content.trim() !== saved
   const approved = question.model_answer?.is_approved ?? false
 
@@ -39,6 +41,18 @@ function AnswerEditor({ question }: { question: Question }) {
     try {
       setExam(await examApi.saveModelAnswer(question.id, content.trim(), approve))
       toast.success(approve ? `Model answer ${question.full_label} approved` : `Draft saved for ${question.full_label}`)
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const draftWithAi = async () => {
+    setBusy('ai')
+    try {
+      setExam(await examApi.draftModelAnswer(question.id))
+      toast.success(`AI draft ready for ${question.full_label}. Review it before approving.`)
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {
@@ -79,6 +93,11 @@ function AnswerEditor({ question }: { question: Question }) {
       />
       {editable && (
         <div className="flex flex-wrap justify-end gap-2">
+          {canDraft && !approved && !dirty && (
+            <Button size="sm" variant="ghost" onClick={draftWithAi} loading={busy === 'ai'} disabled={!question.text.trim()}>
+              <Bot /> {question.model_answer ? 'Redraft with AI' : 'Draft with AI'}
+            </Button>
+          )}
           {question.model_answer && !dirty && (
             <Button size="sm" variant="ghost" onClick={remove} loading={busy === 'remove'}>
               Remove
@@ -126,6 +145,7 @@ export function AnswersStep() {
   const [overwrite, setOverwrite] = useState(false)
   const [report, setReport] = useState<ModelAnswerUploadResult | null>(null)
   const answerDoc = exam.documents.find((d) => d.kind === 'model_answer')
+  const slots = useAiSlots()
   const approvedCount = leaves.filter((q) => q.model_answer?.is_approved).length
 
   const onFile = async (file: File) => {
@@ -175,7 +195,11 @@ export function AnswersStep() {
           </CardBody>
           <div className="divide-y divide-zinc-100">
             {leaves.map((question) => (
-              <AnswerEditor key={`${question.id}:${question.model_answer?.updated_at ?? 'none'}`} question={question} />
+              <AnswerEditor
+                key={`${question.id}:${question.model_answer?.updated_at ?? 'none'}`}
+                question={question}
+                canDraft={slots.has('evaluator')}
+              />
             ))}
           </div>
         </>
