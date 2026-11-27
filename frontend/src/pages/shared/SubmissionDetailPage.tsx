@@ -9,9 +9,9 @@ import { useAiSlots } from '@/hooks/useAiSlots'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
 import { usePolling } from '@/hooks/usePolling'
-import { EvaluationView } from '@/pages/teacher/submission/EvaluationView'
 import { ExtractionEditor } from '@/pages/teacher/submission/ExtractionEditor'
 import { ProcessingPanel } from '@/pages/teacher/submission/ProcessingPanel'
+import { ReviewPanel } from '@/pages/teacher/submission/ReviewPanel'
 import { processingApi, submissionApi } from '@/services/api'
 import type { SubmissionDetail } from '@/types/api'
 import { formatBytes, formatDateTime } from '@/utils/format'
@@ -45,7 +45,15 @@ function TeacherProcessing({ submission, onUpdated }: { submission: SubmissionDe
           }}
         />
       )}
-      {evaluation.data && <EvaluationView evaluation={evaluation.data} />}
+      {evaluation.data && (
+        <ReviewPanel
+          key={`${evaluation.data.id}:${evaluation.data.review_status}`}
+          evaluation={evaluation.data}
+          submission={submission}
+          onEvaluation={(updated) => evaluation.setData(() => updated)}
+          onSubmission={onUpdated}
+        />
+      )}
     </>
   )
 }

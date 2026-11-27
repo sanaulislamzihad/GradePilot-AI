@@ -40,7 +40,8 @@ export function ProcessingPanel({ submission, hasEvaluator, onUpdated }: Process
 
   const canProcess = status === 'uploaded'
   const canRetry = status === 'failed'
-  const canRemark = ['ready_for_evaluation', 'teacher_review_required', 'ocr_review_required'].includes(status)
+  // Re-marking a run under review goes through 'Reject and re-mark' in the review panel.
+  const canRemark = status === 'ready_for_evaluation'
 
   return (
     <Card>
@@ -88,12 +89,12 @@ export function ProcessingPanel({ submission, hasEvaluator, onUpdated }: Process
                   <RotateCcw /> Retry
                 </Button>
               )}
-              {canRemark && status !== 'ocr_review_required' && (
+              {canRemark && (
                 <Button variant="secondary" onClick={() => run('evaluate', 'Marking finished')} loading={busy === 'evaluate'}>
                   <RefreshCw /> Mark again
                 </Button>
               )}
-              {(canRemark || canRetry) && (
+              {(canRemark || canRetry || status === 'teacher_review_required') && (
                 <Button variant="ghost" onClick={() => run('extract', 'Script read again')} loading={busy === 'extract'}>
                   Read script again
                 </Button>
