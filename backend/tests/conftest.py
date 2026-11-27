@@ -32,7 +32,7 @@ from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.api.deps import auth_limiter  # noqa: E402
+from app.api.deps import LIMITERS  # noqa: E402
 from app.database.base import Base  # noqa: E402
 from app.database.session import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
@@ -66,7 +66,8 @@ def _clean_state() -> Iterator[None]:
             # Reference data seeded by migrations stays in place.
             if table.name not in SEEDED_TABLES:
                 conn.execute(table.delete())
-    auth_limiter.reset()
+    for limiter in LIMITERS:
+        limiter.reset()
 
 
 @pytest.fixture
