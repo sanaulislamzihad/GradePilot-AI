@@ -47,6 +47,9 @@ class SubmissionDetail(SubmissionSummary):
     max_attempts: int
     submission_deadline: datetime | None
     files: list[SubmissionFileRead]
+    # Teacher-only; always None in responses to students.
+    processing_error: str | None = None
+    extraction_notes: str | None = None
 
 
 class LatestSubmission(BaseModel):

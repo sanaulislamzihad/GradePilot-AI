@@ -20,7 +20,7 @@ from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
 from app.schemas.common import Page
 from app.schemas.submission import SubmissionDetail, SubmissionSummary
-from app.services import storage
+from app.services import processing, storage
 from app.services import submission_service as svc
 
 router = APIRouter(tags=["submissions"])
@@ -64,6 +64,10 @@ async def submit_script(
     if not created:
         # Same request repeated (double click, retry after a dropped connection).
         response.status_code = status.HTTP_200_OK
+    else:
+        # Start reading and marking right away when the teacher has AI set up.
+        processing.queue_on_upload(db, _visible_submission(db, student, submission.id))
+        db.expire_all()
     return svc.detail(_visible_submission(db, student, submission.id))
 
 
@@ -107,7 +111,7 @@ def list_submissions(
 
 @router.get("/submissions/{submission_id}", response_model=SubmissionDetail)
 def get_submission(submission_id: uuid.UUID, user: CurrentUser, db: DbSession) -> SubmissionDetail:
-    return svc.detail(_visible_submission(db, user, submission_id))
+    return svc.detail(_visible_submission(db, user, submission_id), include_teacher_fields=user.role == UserRole.TEACHER)
 
 
 @router.get("/submissions/{submission_id}/files/{file_id}")

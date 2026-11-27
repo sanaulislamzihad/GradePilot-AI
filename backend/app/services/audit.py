@@ -40,6 +40,12 @@ _SUMMARIES: dict[str, str] = {
     "exam.unpublish": "Unpublished exam {title}",
     "ai.key_saved": "Saved an API key for {provider}",
     "ai.key_deleted": "Removed the API key for {provider}",
+    "submission.process": "Started processing submission {code}",
+    "submission.evaluate": "Started marking submission {code}",
+    "submission.extraction_corrected": "Corrected the extracted answers of {code}",
+    "exam.paper_ocr": "Read the question paper of {title} with AI",
+    "question.ai_answer": "Drafted a model answer with AI for {title}",
+    "question.ai_rubric": "Drafted a rubric with AI for {title}",
     "submission.create": "Submitted attempt {attempt} for {title} ({code})",
     "enrollment.leave": "Left {code} section {section}",
 }

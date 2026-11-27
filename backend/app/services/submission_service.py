@@ -137,12 +137,14 @@ def summary(submission: Submission) -> SubmissionSummary:
     )
 
 
-def detail(submission: Submission) -> SubmissionDetail:
+def detail(submission: Submission, *, include_teacher_fields: bool = False) -> SubmissionDetail:
     return SubmissionDetail(
         **summary(submission).model_dump(),
         max_attempts=submission.exam.max_attempts,
         submission_deadline=submission.exam.submission_deadline,
         files=[SubmissionFileRead.model_validate(f) for f in submission.files],
+        processing_error=submission.processing_error if include_teacher_fields else None,
+        extraction_notes=submission.extraction_notes if include_teacher_fields else None,
     )
 
 
