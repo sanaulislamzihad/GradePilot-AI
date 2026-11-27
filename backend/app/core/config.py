@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -60,9 +60,18 @@ class Settings(BaseSettings):
     similarity_enabled: bool = True
     similarity_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 
-    # Simple per-process limiter for credential endpoints.
+    # Rate limits. With RATE_LIMIT_REDIS_URL set, counts are shared by every API
+    # worker; otherwise each process keeps its own (fine for a single worker).
+    rate_limit_redis_url: str = ""
     auth_rate_limit_attempts: int = 10
     auth_rate_limit_window_seconds: int = 300
+    upload_rate_limit_attempts: int = 20
+    upload_rate_limit_window_seconds: int = 600
+    ai_rate_limit_attempts: int = 60
+    ai_rate_limit_window_seconds: int = 600
+
+    # Largest request body accepted, in megabytes (answer scripts are limited per exam, up to 50 MB).
+    max_request_size_mb: int = Field(default=60, ge=1, le=500)
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -96,6 +105,24 @@ class Settings(BaseSettings):
     def _resolve_storage(cls, value: Path) -> Path:
         # Relative paths are resolved from the backend folder, not the shell cwd.
         return value if value.is_absolute() else (BACKEND_DIR / value).resolve()
+
+    @model_validator(mode="after")
+    def _production_safety(self) -> "Settings":
+        """Refuse to start a production server with settings that are only safe locally."""
+        if self.environment != "production":
+            return self
+        problems = []
+        if not self.cookie_secure:
+            problems.append("COOKIE_SECURE must be true (the app must be served over HTTPS)")
+        if not self.encryption_keys or "replace-with" in self.encryption_keys:
+            problems.append("ENCRYPTION_KEYS must be set so provider API keys can be stored encrypted")
+        if self.is_sqlite:
+            problems.append("DATABASE_URL must point to PostgreSQL; SQLite is for local development only")
+        if self.celery_broker_url.startswith("sqla+sqlite"):
+            problems.append("CELERY_BROKER_URL must point to Redis")
+        if problems:
+            raise ValueError("Unsafe production configuration: " + "; ".join(problems))
+        return self
 
     @property
     def is_sqlite(self) -> bool:
