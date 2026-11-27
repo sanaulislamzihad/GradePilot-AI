@@ -104,6 +104,22 @@ def test_verifier_agreement_and_disagreement(client, teacher, student, ai):
     assert q1["verification"]["same_model_as_evaluator"] is True
 
 
+def test_checks_can_be_run_again_and_replace_earlier_results(client, teacher, student, ai):
+    examiners = Examiners(
+        {"1": [score(5, ["learn patterns from data"])], "2(a)": [score(3, ["uses labelled examples"])]},
+        {"1": [verdict(1), verdict(5)], "2(a)": [verdict(3)]},  # the first opinion on 1 disagrees, the second agrees
+    )
+    submission, evaluation = run(client, teacher, student, ai, examiners)
+    assert "verifier_disagrees" in by_label(evaluation)["1"]["flags"]
+
+    rechecked = client.post(f"/api/evaluations/{evaluation['id']}/verify", headers=auth(teacher))
+    assert rechecked.status_code == 200 and rechecked.json()["status"] == "teacher_review_required"
+    again = client.get(f"/api/submissions/{submission['id']}/evaluation", headers=auth(teacher)).json()
+    assert len(examiners.verifier_prompts["2(a)"]) == 2  # every question was checked again
+    q1 = by_label(again)["1"]
+    assert q1["verification"]["verdict"] == "agrees" and "verifier_disagrees" not in q1["flags"]
+
+
 def test_verifier_doubts_about_rubric_or_evidence_are_flagged(client, teacher, student, ai):
     examiners = Examiners({"1": [score(5, ["learn patterns from data"])]}, {"1": [verdict(5, evidence=False)]})
     _, evaluation = run(client, teacher, student, ai, examiners)
@@ -118,6 +134,19 @@ def test_broken_verifier_output_does_not_block_review(client, teacher, student, 
     assert submission["status"] == "teacher_review_required"
     assert evaluation["verification_status"] == "failed"
     assert "verification_failed" in by_label(evaluation)["1"]["flags"]
+
+
+def test_unexpected_check_errors_are_shown_not_hidden(client, teacher, student, ai, monkeypatch):
+    from app.services import verification
+
+    def broken(db, evaluation):
+        raise RuntimeError("bug")
+
+    examiners = Examiners({"1": [score(5, ["learn patterns from data"])]}, {})
+    monkeypatch.setattr(verification, "verify", broken)
+    submission, evaluation = run(client, teacher, student, ai, examiners)
+    assert submission["status"] == "teacher_review_required"
+    assert evaluation["verification_status"] == "failed" and "verification_failed" in evaluation["flags"]
 
 
 def test_without_a_verifier_local_checks_still_run(client, teacher, student, ai, monkeypatch):

@@ -157,11 +157,18 @@ def verify(db: Session, evaluation: Evaluation) -> None:
     if ai_router.has_slot(db, exam.teacher_id, ModelSlot.VERIFIER):
         config = ai_router.slot_config(db, exam.teacher_id, ModelSlot.VERIFIER)
 
+    # Re-running replaces earlier output. Delete old results first (they are unique
+    # per question) and commit, so no write transaction stays open during the AI
+    # calls: usage logging writes from its own session, which SQLite would block.
+    for row in evaluation.questions:
+        if row.verification is not None:
+            db.delete(row.verification)
+            row.verification = None
+        row.flags = [f for f in row.flags if f not in VERIFICATION_FLAGS]
+    db.commit()
+
     attempted = failed = 0
     for row in evaluation.questions:
-        # Re-running replaces earlier verification output.
-        row.flags = [f for f in row.flags if f not in VERIFICATION_FLAGS]
-        row.verification = None
         question = questions.get(row.question_id)
         text = answers.get(row.question_id, "")
         if question is None or row.awarded is None or row.answer_status != AnswerStatus.ANSWERED.value or not text.strip():

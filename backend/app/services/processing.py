@@ -18,7 +18,7 @@ from app.models.evaluation import ExtractedAnswer
 from app.models.exam import Exam, Question, Rubric
 from app.models.submission import Submission, SubmissionStatus as S
 from app.providers.base import AIConfigurationError, AIError
-from app.models.evaluation import Evaluation, EvaluationCriterion, EvaluationQuestion
+from app.models.evaluation import Evaluation, EvaluationCriterion, EvaluationQuestion, VerificationStatus
 from app.services import ai_router, evaluation_runner, extraction, verification
 
 logger = logging.getLogger("gradepilot.processing")
@@ -122,7 +122,18 @@ def _verify(db: Session, submission_id: uuid.UUID, evaluation_id: uuid.UUID) -> 
     except Exception:  # noqa: BLE001
         db.rollback()
         logger.exception("Verification failed for evaluation %s", evaluation_id)
+        _mark_verification_failed(db, evaluation_id)
     transition(db, submission_id, (S.VERIFYING,), S.TEACHER_REVIEW_REQUIRED)
+
+
+def _mark_verification_failed(db: Session, evaluation_id: uuid.UUID) -> None:
+    """Make an unexpected failure visible to the teacher instead of showing stale results."""
+    evaluation = db.get(Evaluation, evaluation_id)
+    if evaluation is None:
+        return
+    evaluation.verification_status = VerificationStatus.FAILED.value
+    evaluation.flags = sorted({*evaluation.flags, verification.FLAG_VERIFICATION_FAILED})
+    db.commit()
 
 
 def run_verification(db: Session, submission_id: uuid.UUID) -> None:
