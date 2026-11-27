@@ -137,6 +137,11 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
+On Windows, if `pip` fails with a hint about **long path support**, the repository sits in a
+folder whose path is too long for some PyTorch files. Clone it into a shorter folder (for
+example `C:\dev\GradePilot-AI`) or
+[enable long paths](https://pip.pypa.io/warnings/enable-long-paths), then run the install again.
+
 Interactive API documentation is served at <http://localhost:8000/api/docs>
 (disabled when `ENVIRONMENT=production`).
 
