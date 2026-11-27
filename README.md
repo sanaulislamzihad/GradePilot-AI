@@ -7,7 +7,7 @@ GradePilot AI helps teachers mark examination scripts against a rubric they appr
 The AI suggests marks with evidence for every criterion; teachers review, adjust and
 publish the final result. AI marks are never treated as final on their own.
 
-The project is built in phases. **Phases 1 to 4 are complete**:
+The project is built in phases. **Phases 1 to 5 are complete**:
 
 - **Phase 1 — Foundation:** authentication, role-based access control, course and section
   management, and dashboards for teachers, students and administrators.
@@ -21,6 +21,9 @@ The project is built in phases. **Phases 1 to 4 are complete**:
   six provider adapters behind one AI router, model slots with live capability checks,
   answer extraction (text layer or OCR), rubric-based evaluation with backend score
   validation, background processing with Celery, and AI drafting of model answers and rubrics.
+- **Phase 5 — Advanced evaluation:** independent verification by a second model, SymPy
+  checks of mathematical answers, a local semantic-similarity signal, review flags, and the
+  teacher review workflow (overrides, comments, approval, re-marking, change history).
 
 See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md) for the status of every phase.
 
@@ -40,8 +43,9 @@ See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md) for the status of every phase.
 | Testing   | pytest, FastAPI TestClient · Vitest, Testing Library |
 | Other     | `qrcode` (QR codes generated in the browser, no external service) |
 
-Planned for later phases: Sentence Transformers and SymPy (verification, Phase 5),
-Recharts (analytics, Phase 6) and Docker Compose (Phase 7).
+| Local checks | SymPy (symbolic answer checks), Sentence Transformers all-MiniLM-L6-v2 (similarity, CPU, no API key) |
+
+Planned for later phases: Recharts (analytics, Phase 6) and Docker Compose (Phase 7).
 
 ## Repository layout
 
@@ -113,7 +117,7 @@ To use PostgreSQL, set for example
 cd backend
 python -m venv .venv
 # Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
-pip install -r requirements-dev.txt
+pip install -r requirements-dev.txt --extra-index-url https://download.pytorch.org/whl/cpu
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
@@ -261,6 +265,33 @@ Student text is always passed to models as data, with an instruction to ignore a
 instructions it contains. Every request is logged with tokens, latency, outcome and cost
 when the provider reports it.
 
+## Verification and teacher review (Phase 5)
+
+After the evaluator marks a submission it moves to **Verifying** before the teacher sees it:
+
+- **Verifier model (slot C).** A second model audits every marked question: was the rubric
+  followed, does the quoted evidence support each mark, were valid points or alternative
+  answers missed, did the marker assume things the answer does not say. It suggests its own
+  mark per criterion. A difference of at least 20% of the question's marks (minimum 1), or
+  doubts about the rubric or evidence, becomes a **Verifier disagrees** flag. The two
+  examiners' marks are never averaged. Use a different provider or model when you can.
+- **SymPy.** For mathematical questions the student's final answer is compared symbolically
+  with the model answer (equivalent forms match) and each equation in the working is checked
+  against the expected solution. Answers that cannot be parsed are flagged as uncertain.
+  Student text is filtered through a strict whitelist before SymPy parses it, because the
+  parser evaluates Python.
+- **Similarity.** Sentence Transformers (all-MiniLM-L6-v2) runs locally on the CPU with no API
+  key. It never sets marks; it flags evaluations where the marks and the answer's closeness to
+  the model answer point in opposite directions. The model (~90 MB) downloads on first use;
+  set `SIMILARITY_ENABLED=false` to turn it off.
+
+The **AI Evaluation** page lists evaluations awaiting review, flagged ones first, and can
+approve every evaluation of an exam that has no flags. On a submission, the teacher can set a
+mark per criterion or for the whole question, add comments, approve, send the answers back
+for a fresh marking run with a reason, re-run the checks, or reopen an approval before
+results are released. AI scores are kept unchanged; the server recalculates every final mark
+and validates it against its maximum. Every change is recorded in the review history.
+
 ## API overview
 
 | Area | Endpoints |
@@ -281,6 +312,7 @@ when the provider reports it.
 | AI settings | `GET /api/providers` · `POST /api/providers/connect` · `POST /api/providers/test` · `GET /api/providers/models` · `DELETE /api/providers/{id}` · `GET /api/model-configs` · `PUT/DELETE /api/model-configs/{slot}` · `POST /api/model-configs/{slot}/check` · `GET /api/usage` |
 | Processing | `POST /api/submissions/{id}/extract` · `POST /api/submissions/{id}/evaluate` · `POST /api/submissions/{id}/retry` · `POST /api/exams/{id}/process-pending` · `GET/PUT /api/submissions/{id}/extracted-answers` |
 | Evaluations | `GET /api/submissions/{id}/evaluation` · `GET /api/evaluations/{id}` |
+| Review | `GET /api/evaluations` · `PUT /api/evaluations/{id}/review` · `POST /api/evaluations/{id}/approve` · `POST /api/evaluations/{id}/reopen` · `POST /api/evaluations/{id}/reject` · `POST /api/evaluations/{id}/verify` · `GET /api/evaluations/{id}/history` · `POST /api/exams/{id}/approve-unflagged` |
 | AI drafting | `POST /api/exams/{id}/ocr-question-paper` · `POST /api/questions/{id}/model-answer/generate` · `POST /api/questions/{id}/rubric/suggest` |
 | Public | `GET /api/public/exams/{slug}` |
 | Health | `GET /api/health` |

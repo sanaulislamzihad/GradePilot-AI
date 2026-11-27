@@ -10,7 +10,7 @@ A feature is marked done only when it is implemented, tested and working end to 
 | 2 | Exam management: creation, question paper, questions, marks, answers, rubrics, publishing | ✅ Done |
 | 3 | Student submission: exam access, script upload, attempts, submission records | ✅ Done |
 | 4 | AI integration: BYOK, provider adapters, router, extraction, evaluation, background jobs | ✅ Done |
-| 5 | Advanced evaluation | ⬜ |
+| 5 | Advanced evaluation: verification, SymPy, similarity, review flags, teacher review | ✅ Done |
 | 6 | Results and analytics | ⬜ |
 | 7 | Production readiness | ⬜ |
 
@@ -223,14 +223,45 @@ A feature is marked done only when it is implemented, tested and working end to 
   script and a photographed script, OCR review and confirmation, AI marks, student view without marks
 
 ### Not done in this phase
-- Verifier slot is configurable, but independent verification runs from Phase 5.
-- Mathematical verification with SymPy and similarity signals from Sentence Transformers are Phase 5.
 - No real provider was called during development (no keys were available); adapters are tested
   against recorded request and response shapes. Run **Check capabilities** after connecting a real key.
 
-## Phase 5 — Advanced evaluation ⬜
-- ⬜ Independent verification, SymPy maths checks, review flags
-- ⬜ Teacher review dashboard with audit trail
+## Phase 5 — Advanced evaluation ✅
+
+### Independent verification
+- ✅ Verifier model audits every marked question: rubric use, evidence, missed valid points,
+  unsupported assumptions, a suggested mark per criterion; output validated like the evaluator's
+- ✅ Disagreement (20% of the marks, minimum 1) or doubts about rubric or evidence flag the
+  question; marks are never averaged; same-model verification is shown to the teacher
+- ✅ Verification never blocks review: AI failures and unexpected errors become flags
+- ✅ New Verifying stage, and re-running the checks replaces earlier results
+
+### Local checks (no API key)
+- ✅ SymPy: equivalent final answers, per-step checks of the working, "uncertain" when the
+  answer cannot be read; strict whitelist before parsing because the parser evaluates Python
+- ✅ Sentence Transformers all-MiniLM-L6-v2 similarity on the CPU, used only as a signal and
+  skipped if the package or model is unavailable
+
+### Teacher review
+- ✅ Per-criterion and per-question marks, question and overall comments; values validated
+  against their maximum; AI scores kept; final marks and total recalculated by the server
+- ✅ Approve only when every question has a final mark; reopen before release
+- ✅ Reject with a reason to start a fresh marking run; earlier runs kept
+- ✅ Review history from the audit log, including every changed mark
+- ✅ AI Evaluation queue with flagged evaluations first and bulk approval of unflagged ones
+
+### Fixed along the way
+- ✅ Re-running verification hit a unique constraint, and then an open write transaction
+  blocked usage logging on SQLite; both rolled the run back silently. Old results are now
+  committed away before any AI call and unexpected failures are flagged.
+
+### Tests
+- ✅ Backend: 182 tests in total — SymPy outcomes and parser safety, verifier agreement,
+  disagreement, doubts and broken output, re-running checks, similarity flags, overrides and
+  recalculation, approval rules, reopen, reject and re-mark, bulk approval, review queue, roles
+- ✅ Frontend: 34 tests in total — review panel marks, validation and payload, read-only approved state
+- ✅ Real browser run with the Celery worker, the local Sentence Transformers model and a stub
+  verifier: checks re-run from the API, review queue, override and approval, review history
 
 ## Phase 6 — Results and analytics ⬜
 - ⬜ Result publication modes, student result page, PDF reports
