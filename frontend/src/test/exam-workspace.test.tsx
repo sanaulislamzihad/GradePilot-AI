@@ -57,6 +57,8 @@ function exam(overrides: Partial<ExamDetail> = {}): ExamDetail {
     created_at: '2026-11-25T10:00:00Z',
     updated_at: '2026-11-25T10:00:00Z',
     published_at: null,
+    result_release_mode: 'after_approval',
+    release_teacher_comments: true,
     instructions: null,
     allowed_formats: ['pdf'],
     max_file_size_mb: 20,

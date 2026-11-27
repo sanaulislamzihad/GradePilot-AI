@@ -11,6 +11,11 @@ import type {
   ExamType,
   Evaluation,
   EvaluationQueueItem,
+  ExamAnalytics,
+  ExamResults,
+  ReleaseSettings,
+  ResultView,
+  StudentResultItem,
   ExtractionView,
   HistoryEntry,
   ReviewStatus,
@@ -272,4 +277,36 @@ export const reviewApi = {
   history: (id: string) => data(http.get<HistoryEntry[]>(`/evaluations/${id}/history`)),
   approveUnflagged: (examId: string) =>
     data(http.post<{ approved: number; skipped: number }>(`/exams/${examId}/approve-unflagged`)),
+}
+
+/** Download a file; error bodies arrive as Blobs too, so decode them for errorMessage(). */
+const blob = (url: string) =>
+  http
+    .get<Blob>(url, { responseType: 'blob', timeout: 120_000 })
+    .then((r) => r.data)
+    .catch(async (error) => {
+      const body = error?.response?.data
+      if (body instanceof Blob && body.type.includes('json')) {
+        try {
+          error.response.data = JSON.parse(await body.text())
+        } catch {
+          // keep the original error
+        }
+      }
+      throw error
+    })
+
+export const resultsApi = {
+  forExam: (examId: string) => data(http.get<ExamResults>(`/exams/${examId}/results`)),
+  saveSettings: (examId: string, settings: ReleaseSettings) =>
+    data(http.patch<ReleaseSettings>(`/exams/${examId}/release-settings`, settings)),
+  publish: (submissionId: string) => data(http.post<ResultView>(`/results/${submissionId}/publish`)),
+  withdraw: (submissionId: string) => http.post(`/results/${submissionId}/withdraw`),
+  publishAll: (examId: string) => data(http.post<{ published: number; skipped: number }>(`/exams/${examId}/publish-results`)),
+  get: (submissionId: string) => data(http.get<ResultView>(`/results/${submissionId}`)),
+  mine: () => data(http.get<StudentResultItem[]>('/student/results')),
+  analytics: (examId: string) => data(http.get<ExamAnalytics>(`/exams/${examId}/analytics`)),
+  resultPdf: (submissionId: string) => blob(`/results/${submissionId}/pdf`),
+  resultsCsv: (examId: string) => blob(`/exams/${examId}/results.csv`),
+  classReport: (examId: string) => blob(`/exams/${examId}/report.pdf`),
 }

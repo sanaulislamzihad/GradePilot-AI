@@ -228,6 +228,8 @@ export interface ReadinessCheck {
 }
 
 export interface ExamDetail extends ExamSummary {
+  result_release_mode: ResultReleaseMode
+  release_teacher_comments: boolean
   instructions: string | null
   allowed_formats: string[]
   max_file_size_mb: number
@@ -553,4 +555,113 @@ export interface Evaluation {
   reviewed_by: string | null
   reviewed_at: string | null
   questions: EvaluationQuestion[]
+}
+
+// --- Results and analytics (Phase 6) ---------------------------------------
+
+export type ResultReleaseMode = 'after_approval' | 'provisional'
+
+export interface ResultCriterion {
+  name: string
+  max_marks: number
+  awarded: number
+  explanation: string | null
+  missing_concepts: string[]
+}
+
+export interface ResultQuestion {
+  label: string
+  text: string
+  max_marks: number
+  awarded: number | null
+  answered: boolean
+  feedback: string | null
+  missing_concepts: string[]
+  teacher_comment: string | null
+  criteria: ResultCriterion[]
+}
+
+export interface ResultView {
+  submission_id: string
+  submission_code: string
+  exam_id: string
+  exam_title: string
+  course_code: string | null
+  section_name: string | null
+  student_name: string
+  student_number: string
+  provisional: boolean
+  total: number
+  max_marks: number
+  percentage: number
+  published_at: string | null
+  teacher_comment: string | null
+  questions: ResultQuestion[]
+}
+
+export interface StudentResultItem {
+  submission_id: string
+  exam_id: string
+  exam_title: string
+  course_code: string | null
+  provisional: boolean
+  total: number
+  max_marks: number
+  percentage: number
+  published_at: string | null
+}
+
+export interface ExamResultRow {
+  submission_id: string
+  submission_code: string
+  student_name: string
+  student_number: string
+  status: SubmissionStatus
+  final_total: number | null
+  max_marks: number
+  percentage: number | null
+  published: boolean
+  published_at: string | null
+}
+
+export interface ReleaseSettings {
+  result_release_mode: ResultReleaseMode
+  release_teacher_comments: boolean
+}
+
+export interface ExamResults extends ReleaseSettings {
+  exam_id: string
+  exam_title: string
+  rows: ExamResultRow[]
+  approved_unpublished: number
+}
+
+export interface QuestionStat {
+  label: string
+  text: string
+  max_marks: number
+  average: number | null
+  average_percentage: number | null
+  answered: number
+}
+
+export interface ExamAnalytics {
+  exam_id: string
+  exam_title: string
+  total_marks: number
+  total_students: number
+  total_submissions: number
+  pending_evaluations: number
+  approved_results: number
+  published_results: number
+  graded_count: number
+  average: number | null
+  median: number | null
+  highest: number | null
+  lowest: number | null
+  average_percentage: number | null
+  distribution: { label: string; count: number }[]
+  questions: QuestionStat[]
+  weakest_questions: QuestionStat[]
+  common_missing_concepts: { concept: string; count: number }[]
 }
