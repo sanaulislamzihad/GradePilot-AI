@@ -75,7 +75,9 @@ export function ExtractionEditor({ submissionId, view, onSaved }: ExtractionEdit
                 <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
                   {answer.needs_review && <StatusBadge tone="warning">Check this</StatusBadge>}
                   <span>{sourceLabel[answer.source]}</span>
-                  {answer.source === 'ai_ocr' && <span className="tabular-nums">· {Math.round(answer.confidence * 100)}% confident</span>}
+                  {answer.source === 'ai_ocr' && answer.status === 'answered' && (
+                    <span className="tabular-nums">· {Math.round(answer.confidence * 100)}% confident</span>
+                  )}
                   {answer.pages.length > 0 && <span>· page {answer.pages.join(', ')}</span>}
                 </div>
               </div>
