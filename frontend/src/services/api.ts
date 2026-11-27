@@ -9,7 +9,15 @@ import type {
   ExamSummary,
   ExamStatus,
   ExamType,
+  Evaluation,
+  ExtractionView,
   ModelAnswerUploadResult,
+  ModelConfig,
+  ModelInfo,
+  ModelSlot,
+  Provider,
+  UsageReport,
+  AnswerStatus,
   Page,
   PublicExam,
   QuestionType,
@@ -193,6 +201,11 @@ export const examApi = {
     data(http.put<ExamDetail>(`/questions/${questionId}/rubric`, { criteria, approved })),
   removeRubric: (questionId: string) => data(http.delete<ExamDetail>(`/questions/${questionId}/rubric`)),
 
+  readPaperWithAi: (id: string) => data(http.post<ExamDetail>(`/exams/${id}/ocr-question-paper`, undefined, { timeout: 300_000 })),
+  draftModelAnswer: (questionId: string) =>
+    data(http.post<ExamDetail>(`/questions/${questionId}/model-answer/generate`, undefined, { timeout: 180_000 })),
+  suggestRubric: (questionId: string) =>
+    data(http.post<ExamDetail>(`/questions/${questionId}/rubric/suggest`, undefined, { timeout: 180_000 })),
   publish: (id: string) => data(http.post<ExamDetail>(`/exams/${id}/publish`)),
   unpublish: (id: string) => data(http.post<ExamDetail>(`/exams/${id}/unpublish`)),
 }
@@ -207,4 +220,31 @@ export const submissionApi = {
   get: (id: string) => data(http.get<SubmissionDetail>(`/submissions/${id}`)),
   downloadFile: (id: string, fileId: string) =>
     http.get<Blob>(`/submissions/${id}/files/${fileId}`, { responseType: 'blob' }).then((r) => r.data),
+}
+
+export const aiApi = {
+  providers: () => data(http.get<Provider[]>('/providers')),
+  connect: (provider: string, api_key: string, base_url?: string) =>
+    data(http.post<Provider>('/providers/connect', { provider, api_key, base_url: base_url || null }, { timeout: 60_000 })),
+  test: (provider: string) => data(http.post<Provider>('/providers/test', { provider }, { timeout: 60_000 })),
+  models: (provider: string) => data(http.get<ModelInfo[]>('/providers/models', { params: { provider }, timeout: 60_000 })),
+  removeProvider: (connectionId: string) => http.delete(`/providers/${connectionId}`),
+  modelConfigs: () => data(http.get<ModelConfig[]>('/model-configs')),
+  setModelConfig: (slot: ModelSlot, provider: string, model: string) =>
+    data(http.put<ModelConfig>(`/model-configs/${slot}`, { provider, model })),
+  clearModelConfig: (slot: ModelSlot) => http.delete(`/model-configs/${slot}`),
+  checkModelConfig: (slot: ModelSlot) => data(http.post<ModelConfig>(`/model-configs/${slot}/check`, undefined, { timeout: 180_000 })),
+  usage: (page: number, page_size = 20) => data(http.get<UsageReport>('/usage', { params: { page, page_size } })),
+}
+
+export const processingApi = {
+  extract: (id: string) => data(http.post<SubmissionDetail>(`/submissions/${id}/extract`, undefined, { timeout: 300_000 })),
+  retry: (id: string) => data(http.post<SubmissionDetail>(`/submissions/${id}/retry`, undefined, { timeout: 300_000 })),
+  evaluate: (id: string) => data(http.post<SubmissionDetail>(`/submissions/${id}/evaluate`, undefined, { timeout: 300_000 })),
+  processPending: (examId: string) =>
+    data(http.post<{ queued: number; skipped: number }>(`/exams/${examId}/process-pending`, undefined, { timeout: 300_000 })),
+  extractedAnswers: (id: string) => data(http.get<ExtractionView>(`/submissions/${id}/extracted-answers`)),
+  correctAnswers: (id: string, answers: { question_id: string; text: string; status: AnswerStatus }[], confirm: boolean) =>
+    data(http.put<ExtractionView>(`/submissions/${id}/extracted-answers`, { answers, confirm })),
+  evaluation: (id: string) => data(http.get<Evaluation>(`/submissions/${id}/evaluation`)),
 }

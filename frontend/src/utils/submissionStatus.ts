@@ -17,4 +17,7 @@ export const submissionStatusConfig: Record<
   failed: { label: 'Failed', tone: 'negative' },
 }
 
+/** Statuses during which a background job is working on the submission. */
+export const IN_PROGRESS_STATUSES: SubmissionStatus[] = ['queued', 'extracting', 'evaluating', 'verifying']
+
 export const submissionStatusLabel = (status: SubmissionStatus) => submissionStatusConfig[status].label

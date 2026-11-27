@@ -172,7 +172,7 @@ export interface ExamSummary {
 
 export interface ModelAnswer {
   content: string
-  source: 'manual' | 'uploaded'
+  source: 'manual' | 'uploaded' | 'ai_generated'
   is_approved: boolean
   approved_at: string | null
   updated_at: string
@@ -316,6 +316,9 @@ export interface SubmissionDetail extends SubmissionSummary {
   max_attempts: number
   submission_deadline: string | null
   files: SubmissionFile[]
+  /** Teacher-only; null for students. */
+  processing_error: string | null
+  extraction_notes: string | null
 }
 
 export interface StudentExamItem {
@@ -351,4 +354,136 @@ export interface StudentExamDetail extends StudentExamItem {
   blocked_reason: string | null
   attempts_left: number
   submissions: SubmissionSummary[]
+}
+
+// --- AI integration (Phase 4) ----------------------------------------------
+
+export type ModelSlot = 'ocr' | 'evaluator' | 'verifier'
+export type KeyStatus = 'valid' | 'unverified' | 'invalid'
+
+export interface ProviderConnection {
+  id: string
+  key_hint: string
+  base_url: string | null
+  status: KeyStatus
+  last_tested_at: string | null
+  last_error: string | null
+  created_at: string
+}
+
+export interface Provider {
+  slug: string
+  name: string
+  requires_base_url: boolean
+  connection: ProviderConnection | null
+}
+
+export interface ModelInfo {
+  id: string
+  name: string
+  context_window: number | null
+  supports_vision: boolean | null
+  supports_json: boolean | null
+}
+
+export interface Capabilities {
+  available: boolean | null
+  context_window: number | null
+  text: boolean
+  json: boolean
+  vision: boolean | null
+  errors: Record<string, string>
+}
+
+export interface ModelConfig {
+  slot: ModelSlot
+  provider: string
+  provider_name: string
+  model: string
+  capabilities: Capabilities | null
+  checked_at: string | null
+  updated_at: string
+}
+
+export interface UsageEntry {
+  id: string
+  provider: string
+  model: string
+  slot: string | null
+  task: string
+  input_tokens: number | null
+  output_tokens: number | null
+  cost_usd: number | null
+  latency_ms: number
+  success: boolean
+  error_code: string | null
+  created_at: string
+}
+
+export interface UsageReport {
+  summary: { provider: string; requests: number; failures: number; input_tokens: number; output_tokens: number; cost_usd: number | null }[]
+  items: UsageEntry[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export type AnswerStatus = 'answered' | 'missing' | 'unreadable'
+
+export interface ExtractedAnswer {
+  question_id: string
+  label: string
+  question_text: string
+  max_marks: number | null
+  text: string
+  status: AnswerStatus
+  source: 'pdf_text' | 'ai_ocr' | 'teacher'
+  confidence: number
+  pages: number[]
+  unreadable_notes: string[]
+  needs_review: boolean
+}
+
+export interface ExtractionView {
+  status: SubmissionStatus
+  extraction_notes: string | null
+  answers: ExtractedAnswer[]
+}
+
+export interface EvaluationCriterion {
+  name: string
+  max_marks: number
+  awarded: number
+  explanation: string | null
+  missing_concepts: string[]
+  evidence: { quote: string; found_in_answer: boolean }[]
+}
+
+export interface EvaluationQuestion {
+  question_id: string
+  label: string
+  answer_status: AnswerStatus
+  awarded: number | null
+  max_marks: number
+  feedback: string | null
+  missing_concepts: string[]
+  flags: string[]
+  answer_text: string | null
+  criteria: EvaluationCriterion[]
+}
+
+export interface Evaluation {
+  id: string
+  submission_id: string
+  run_number: number
+  is_current: boolean
+  status: 'completed' | 'failed'
+  provider: string
+  model: string
+  total_awarded: number | null
+  total_max: number
+  flags: string[]
+  started_at: string
+  completed_at: string | null
+  questions: EvaluationQuestion[]
 }
