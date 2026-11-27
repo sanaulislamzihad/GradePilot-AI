@@ -9,7 +9,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, Date, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Date, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base, Timestamps, UTCDateTime, UUIDPrimaryKey, utcnow
@@ -27,6 +27,13 @@ class ExamType(str, enum.Enum):
 class ExamStatus(str, enum.Enum):
     DRAFT = "draft"
     PUBLISHED = "published"
+
+
+class ResultReleaseMode(str, enum.Enum):
+    # Mode B (default): students see results only after the teacher approves and publishes.
+    AFTER_APPROVAL = "after_approval"
+    # Mode A: students see AI marks, labelled provisional, as soon as marking finishes.
+    PROVISIONAL = "provisional"
 
 
 class QuestionType(str, enum.Enum):
@@ -77,6 +84,10 @@ class Exam(UUIDPrimaryKey, Timestamps, Base):
     allowed_formats: Mapped[list[str]] = mapped_column(JSON, default=lambda: ["pdf", "jpg", "jpeg", "png"])
     max_file_size_mb: Mapped[int] = mapped_column(Integer, default=20)
     max_attempts: Mapped[int] = mapped_column(Integer, default=1)
+    result_release_mode: Mapped[str] = mapped_column(
+        String(20), default=ResultReleaseMode.AFTER_APPROVAL.value, server_default=ResultReleaseMode.AFTER_APPROVAL.value
+    )
+    release_teacher_comments: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     # Unguessable token for the shareable exam link; created on first publish.
     public_slug: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

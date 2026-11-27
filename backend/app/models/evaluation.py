@@ -202,3 +202,24 @@ class VerificationResult(UUIDPrimaryKey, Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
     question: Mapped[EvaluationQuestion] = relationship(back_populates="verification")
+
+
+class FinalResult(UUIDPrimaryKey, Base):
+    """A published result: a snapshot of the approved marks and feedback a student may see.
+
+    The snapshot keeps the released result stable and contains only student-facing
+    information: no AI provider details, flags, verification notes or private notes.
+    """
+
+    __tablename__ = "final_results"
+
+    submission_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("submissions.id", ondelete="CASCADE"), unique=True)
+    exam_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("exams.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    evaluation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluations.id", ondelete="CASCADE"))
+    total: Mapped[Decimal] = mapped_column(MARKS)
+    max_marks: Mapped[Decimal] = mapped_column(MARKS)
+    percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2))
+    snapshot: Mapped[dict] = mapped_column(JSON)
+    published_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    published_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
