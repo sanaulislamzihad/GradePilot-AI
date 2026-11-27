@@ -50,6 +50,10 @@ _SUMMARIES: dict[str, str] = {
     "evaluation.approve": "Approved the marks of {code} ({final_total})",
     "evaluation.reopen": "Reopened the marks of {code}",
     "evaluation.reject": "Sent {code} back for re-marking",
+    "exam.release_settings": "Changed how results are released for {title}",
+    "result.publish": "Published the result of {code}",
+    "result.withdraw": "Withdrew the result of {code}",
+    "result.publish_all": "Published {published} results for {title}",
     "submission.create": "Submitted attempt {attempt} for {title} ({code})",
     "enrollment.leave": "Left {code} section {section}",
 }

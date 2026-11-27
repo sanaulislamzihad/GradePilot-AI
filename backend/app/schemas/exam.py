@@ -5,7 +5,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, Field, PlainSerializer, StringConstraints, field_validator
 
-from app.models.exam import AnswerSource, DocumentKind, ExamStatus, ExamType, ExtractionStatus, QuestionType
+from app.models.exam import AnswerSource, DocumentKind, ExamStatus, ExamType, ExtractionStatus, QuestionType, ResultReleaseMode
 from app.schemas.common import ORMModel
 
 
@@ -161,6 +161,8 @@ class Readiness(BaseModel):
 
 
 class ExamDetail(ExamSummary):
+    result_release_mode: ResultReleaseMode
+    release_teacher_comments: bool
     instructions: str | None
     allowed_formats: list[str]
     max_file_size_mb: int

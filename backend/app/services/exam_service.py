@@ -303,6 +303,8 @@ def detail(db: Session, exam_id: uuid.UUID) -> ExamDetail:
     ) or 0
     return ExamDetail(
         **summary(exam, submission_count=submissions).model_dump(),
+        result_release_mode=exam.result_release_mode,  # type: ignore[arg-type]
+        release_teacher_comments=exam.release_teacher_comments,
         instructions=exam.instructions,
         allowed_formats=exam.allowed_formats,
         max_file_size_mb=exam.max_file_size_mb,
