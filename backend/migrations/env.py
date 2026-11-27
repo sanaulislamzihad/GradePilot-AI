@@ -11,7 +11,8 @@ from app.database.base import Base, UTCDateTime
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Keep loggers the app created before migrations ran (tests and the CLI run both in one process).
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # An explicitly supplied URL (tests, `-x`) wins over application settings.
 if not config.get_main_option("sqlalchemy.url"):
