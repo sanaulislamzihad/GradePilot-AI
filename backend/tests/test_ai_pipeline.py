@@ -191,6 +191,29 @@ def test_alternative_wording_and_out_of_scope_answers(client, teacher, student, 
     assert questions["2(a)"]["criteria"][0]["explanation"] == "The answer does not address the question."
 
 
+def test_incorrect_answers_get_zero_with_the_reason(client, teacher, student, ai):
+    exam = published_exam(client, teacher)
+    set_up_ai(client, teacher)
+    wrong = [("answers.pdf", make_pdf([
+        "Student 2021-0042",
+        "Q1. Machine learning is when a programmer writes every rule by hand.",
+    ]))]
+    install_grader(ai, Grader({"1": [{
+        "criteria": [{"id": "C1", "awarded": 0, "evidence": ["a programmer writes every rule by hand"],
+                      "explanation": "Describes hand-written rules, the opposite of learning from data.",
+                      "missing_concepts": ["learning patterns from data"]}],
+        "feedback": "Review what makes machine learning different from rule-based programs.",
+        "missing_concepts": ["learning patterns from data"],
+    }]}))
+    submission = submit(client, student, exam["id"], wrong).json()
+    q1 = by_label(evaluation(client, teacher, submission["id"]))["1"]
+    # The answer was given, so this is a wrong answer, not a missing one.
+    assert q1["awarded"] == 0.0 and "missing_answer" not in q1["flags"]
+    assert q1["criteria"][0]["evidence"][0]["found_in_answer"] is True
+    assert q1["criteria"][0]["explanation"].startswith("Describes hand-written rules")
+    assert q1["missing_concepts"] == ["learning patterns from data"]
+
+
 # --- Scans, OCR review and corrections -------------------------------------
 
 def ocr_reply(answers: list[dict], unassigned: str = "") -> dict:
