@@ -1,15 +1,16 @@
 import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router'
 import { LoadingState } from '@/components/ui/States'
-import { AppLayout } from '@/layouts/AppLayout'
 import { GuestOnly, RequireRole } from '@/layouts/RouteGuards'
-import LandingPage from '@/pages/LandingPage'
 import NotFoundPage from '@/pages/NotFoundPage'
-import PublicExamPage from '@/pages/PublicExamPage'
-import LoginPage from '@/pages/auth/LoginPage'
-import RegisterPage from '@/pages/auth/RegisterPage'
 
-// Role areas are split into separate chunks; visitors only download what they use.
+// Every page is its own chunk, so the first load only carries React and the router.
+// Forms (Zod, React Hook Form) and the signed-in layout load with the pages that use them.
+const AppLayout = lazy(() => import('@/layouts/AppLayout').then((m) => ({ default: m.AppLayout })))
+const LandingPage = lazy(() => import('@/pages/LandingPage'))
+const PublicExamPage = lazy(() => import('@/pages/PublicExamPage'))
+const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
+const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'))
 const ProfilePage = lazy(() => import('@/pages/shared/ProfilePage'))
 const TeacherDashboard = lazy(() => import('@/pages/teacher/TeacherDashboard'))
 const CoursesPage = lazy(() => import('@/pages/teacher/CoursesPage'))
