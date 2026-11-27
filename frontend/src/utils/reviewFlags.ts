@@ -19,7 +19,7 @@ export function needsAttention(flags: string[]): boolean {
 export const reviewStatusLabel = { pending: 'Awaiting review', approved: 'Approved', rejected: 'Sent back' } as const
 export const verificationLabel = {
   pending: 'Not checked',
-  completed: 'Verified',
+  completed: 'Checked',
   skipped: 'Local checks only',
   failed: 'Verification failed',
 } as const
