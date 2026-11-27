@@ -39,6 +39,7 @@ class QuestionType(str, enum.Enum):
 class AnswerSource(str, enum.Enum):
     MANUAL = "manual"
     UPLOADED = "uploaded"
+    AI_GENERATED = "ai_generated"
 
 
 class DocumentKind(str, enum.Enum):

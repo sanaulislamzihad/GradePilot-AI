@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base, Timestamps, UTCDateTime, UUIDPrimaryKey, utcnow
@@ -51,6 +51,8 @@ class Submission(UUIDPrimaryKey, Timestamps, Base):
     status_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
     # Technical detail of the last processing failure, for the teacher only.
     processing_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Extraction remarks for the teacher, e.g. text that could not be matched to a question.
+    extraction_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_count: Mapped[int] = mapped_column(Integer)
     page_count: Mapped[int] = mapped_column(Integer)
     total_size_bytes: Mapped[int] = mapped_column(Integer)
