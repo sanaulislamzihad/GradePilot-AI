@@ -2,14 +2,15 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ProvidersSection } from '@/pages/teacher/ai/ProvidersSection'
-import { EvaluationView } from '@/pages/teacher/submission/EvaluationView'
 import { ExtractionEditor } from '@/pages/teacher/submission/ExtractionEditor'
-import { aiApi, processingApi } from '@/services/api'
-import type { Evaluation, ExtractionView, Provider } from '@/types/api'
+import { ReviewPanel } from '@/pages/teacher/submission/ReviewPanel'
+import { aiApi, processingApi, reviewApi } from '@/services/api'
+import type { Evaluation, ExtractionView, Provider, SubmissionDetail } from '@/types/api'
 
 vi.mock('@/services/api', () => ({
   aiApi: { connect: vi.fn(), test: vi.fn(), removeProvider: vi.fn() },
   processingApi: { correctAnswers: vi.fn() },
+  reviewApi: { save: vi.fn(), approve: vi.fn(), reopen: vi.fn(), reject: vi.fn(), verify: vi.fn(), history: vi.fn() },
 }))
 
 const SECRET = 'sk-live-very-secret-key-4242'
@@ -42,34 +43,81 @@ describe('provider keys', () => {
 
 const evaluation: Evaluation = {
   id: 'e1', submission_id: 's1', run_number: 1, is_current: true, status: 'completed',
-  provider: 'openai', model: 'gpt-test', total_awarded: null, total_max: 15,
-  flags: ['evidence_not_found', 'incomplete', 'missing_answer'], started_at: '', completed_at: '2026-11-27T10:00:00Z',
+  provider: 'openai', model: 'gpt-test', total_awarded: null, total_max: 15, final_total: null,
+  flags: ['evidence_not_found', 'incomplete', 'verifier_disagrees'], started_at: '', completed_at: '2026-11-27T10:00:00Z',
+  verification_status: 'completed', review_status: 'pending', teacher_comment: null, reviewed_by: null, reviewed_at: null,
   questions: [
     {
-      question_id: 'q1', label: '1', answer_status: 'answered', awarded: 4, max_marks: 5, feedback: 'Good definition.',
-      missing_concepts: [], flags: ['evidence_not_found'], answer_text: 'ML learns from data.',
+      question_id: 'q1', label: '1', question_type: 'descriptive', answer_status: 'answered', awarded: 4, teacher_awarded: null,
+      final_awarded: 4, max_marks: 5, feedback: 'Good definition.', missing_concepts: [], flags: ['evidence_not_found', 'verifier_disagrees'],
+      similarity: 0.71, math_check: null, teacher_comment: null, answer_text: 'ML learns from data.',
       criteria: [{
-        name: 'Definition', max_marks: 5, awarded: 4, explanation: 'Mostly correct.', missing_concepts: ['example'],
+        id: 'c1', name: 'Definition', max_marks: 5, awarded: 4, teacher_awarded: null, final_awarded: 4,
+        explanation: 'Mostly correct.', missing_concepts: ['example'],
         evidence: [{ quote: 'learns from data', found_in_answer: true }, { quote: 'deep learning', found_in_answer: false }],
       }],
+      verification: {
+        provider: 'anthropic', model: 'claude-test', same_model_as_evaluator: false, verdict: 'disagrees', suggested_awarded: 2,
+        rubric_followed: true, evidence_supports_marks: false, missed_valid_concepts: [], unsupported_assumptions: [],
+        criterion_notes: [{ criterion: 'Definition', fair: false, suggested_awarded: 2, note: 'No example given.' }], comment: null,
+      },
     },
     {
-      question_id: 'q2', label: '2(a)', answer_status: 'unreadable', awarded: null, max_marks: 10, feedback: null,
-      missing_concepts: [], flags: ['unreadable_answer'], answer_text: '', criteria: [],
+      question_id: 'q2', label: '2(a)', question_type: 'mathematical', answer_status: 'unreadable', awarded: null, teacher_awarded: null,
+      final_awarded: null, max_marks: 10, feedback: null, missing_concepts: [], flags: ['unreadable_answer'],
+      similarity: null, math_check: null, teacher_comment: null, answer_text: '', criteria: [], verification: null,
     },
   ],
 }
 
-describe('evaluation view', () => {
-  it('shows suggested marks, flags and whether each evidence quote was found', () => {
-    render(<EvaluationView evaluation={evaluation} />)
-    expect(screen.getByText('AI-suggested marks')).toBeInTheDocument()
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0) // no total while a question is ungraded
-    expect(screen.getAllByText('Some questions need your marks').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Unreadable — mark it yourself').length).toBeGreaterThan(0)
-    expect(screen.getByLabelText('Found in the answer')).toBeInTheDocument()
+const submission = { id: 's1', status: 'teacher_review_required' } as SubmissionDetail
+
+describe('review panel', () => {
+  it('shows AI marks, checks and evidence, and saves teacher marks', async () => {
+    const user = userEvent.setup()
+    vi.mocked(reviewApi.save).mockResolvedValue({ ...evaluation, final_total: 12 })
+    vi.mocked(reviewApi.history).mockResolvedValue([])
+    const onEvaluation = vi.fn()
+    render(<ReviewPanel evaluation={evaluation} submission={submission} onEvaluation={onEvaluation} onSubmission={vi.fn()} />)
+
+    expect(screen.getAllByText('Verifier disagrees').length).toBeGreaterThan(0)
+    expect(screen.getByText('Suggests 2 / 5')).toBeInTheDocument()
+    expect(screen.getByText('The verifier thinks the evidence does not support the marks.')).toBeInTheDocument()
     expect(screen.getByLabelText('Not found in the answer')).toBeInTheDocument()
-    expect(screen.getByText('Missing: example')).toBeInTheDocument()
+    expect(screen.getByText('Similarity to the model answer: 71% (signal only)')).toBeInTheDocument()
+
+    const mark = screen.getByLabelText('Your mark for 1 Definition')
+    await user.type(mark, '9')
+    expect(mark).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('button', { name: /Save and approve/ })).toBeDisabled()
+    await user.clear(mark)
+    await user.type(mark, '3')
+    const questionMarks = screen.getAllByLabelText('Question mark')
+    await user.type(questionMarks[1]!, '8')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(reviewApi.save).toHaveBeenCalled())
+    const [, payload] = vi.mocked(reviewApi.save).mock.calls[0]!
+    expect(payload).toEqual([
+      { question_id: 'q1', criteria: [{ criterion_id: 'c1', teacher_awarded: 3 }], teacher_awarded: null, teacher_comment: null },
+      { question_id: 'q2', criteria: [], teacher_awarded: 8, teacher_comment: null },
+    ])
+    expect(onEvaluation).toHaveBeenCalledWith(expect.objectContaining({ final_total: 12 }))
+  })
+
+  it('is read-only once approved and offers reopening', () => {
+    vi.mocked(reviewApi.history).mockResolvedValue([])
+    render(
+      <ReviewPanel
+        evaluation={{ ...evaluation, review_status: 'approved', final_total: 12, reviewed_by: 'Ada' }}
+        submission={{ ...submission, status: 'approved' }}
+        onEvaluation={vi.fn()}
+        onSubmission={vi.fn()}
+      />,
+    )
+    expect(screen.getByLabelText('Your mark for 1 Definition')).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /Approve marks/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Reopen/ })).toBeInTheDocument()
   })
 })
 
