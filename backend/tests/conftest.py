@@ -21,6 +21,8 @@ os.environ.update(
         "ENCRYPTION_KEYS": "test:" + "A" * 43 + "=",
         "CELERY_TASK_ALWAYS_EAGER": "true",
         "ALLOW_CUSTOM_AI_ENDPOINTS": "false",
+        # Tests use a stub similarity function instead of downloading the model.
+        "SIMILARITY_ENABLED": "false",
     }
 )
 
