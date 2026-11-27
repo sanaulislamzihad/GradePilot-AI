@@ -1,0 +1,106 @@
+# GradePilot AI production stack.
+#
+#   cp .env.example .env      # then set the values marked "Docker" in it
+#   docker compose up -d --build
+#   docker compose exec api python -m app.cli create-admin --email you@example.edu --name "Your Name"
+#
+# The app is served on http://localhost:8080 (HTTP_PORT). Put it behind an HTTPS
+# reverse proxy or load balancer before real use; see the deployment guide in README.md.
+
+name: gradepilot
+
+x-backend: &backend
+  build: ./backend
+  image: gradepilot-backend
+  env_file: .env
+  environment: &backend-env
+    ENVIRONMENT: production
+    DATABASE_URL: postgresql+psycopg://gradepilot:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/gradepilot
+    CELERY_BROKER_URL: redis://redis:6379/0
+    RATE_LIMIT_REDIS_URL: redis://redis:6379/1
+    # Secure cookies need HTTPS; browsers also accept them on http://localhost.
+    COOKIE_SECURE: "true"
+    STORAGE_DIR: /data/storage
+  volumes:
+    - storage:/data/storage
+    - model-cache:/data/hf-cache
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: gradepilot
+      POSTGRES_USER: gradepilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gradepilot -d gradepilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # Append-only file: queued marking jobs survive a Redis restart.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Applies database migrations once, before the API and worker start.
+  migrate:
+    <<: *backend
+    command: ["migrate"]
+    volumes: []
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *backend
+    command: ["api"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  worker:
+    <<: *backend
+    command: ["worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    image: gradepilot-web
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  storage:
+  model-cache:
